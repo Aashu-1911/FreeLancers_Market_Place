@@ -5,6 +5,11 @@ import RegisterPage from "./pages/RegisterPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import FreelancerProfilePage from "./pages/FreelancerProfilePage.jsx";
 import ClientProfilePage from "./pages/ClientProfilePage.jsx";
+import ProjectListPage from "./pages/ProjectListPage.jsx";
+import ProjectDetailPage from "./pages/ProjectDetailPage.jsx";
+import PostProjectPage from "./pages/PostProjectPage.jsx";
+import ManageProjectsPage from "./pages/ManageProjectsPage.jsx";
+import MyApplicationsPage from "./pages/MyApplicationsPage.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 
@@ -20,6 +25,9 @@ function App() {
             <Link className="hover:text-blue-600" to="/home">
               Home
             </Link>
+            <Link className="hover:text-blue-600" to="/projects">
+              Projects
+            </Link>
             {!isAuthenticated ? (
               <>
                 <Link className="hover:text-blue-600" to="/register">
@@ -31,14 +39,27 @@ function App() {
               </>
             ) : null}
             {isAuthenticated && user?.role === "freelancer" ? (
-              <Link className="hover:text-blue-600" to="/freelancer/profile">
-                My Profile
-              </Link>
+              <>
+                <Link className="hover:text-blue-600" to="/freelancer/profile">
+                  My Profile
+                </Link>
+                <Link className="hover:text-blue-600" to="/freelancer/applications">
+                  My Applications
+                </Link>
+              </>
             ) : null}
             {isAuthenticated && user?.role === "client" ? (
-              <Link className="hover:text-blue-600" to="/client/profile">
-                My Profile
-              </Link>
+              <>
+                <Link className="hover:text-blue-600" to="/client/profile">
+                  My Profile
+                </Link>
+                <Link className="hover:text-blue-600" to="/projects/post">
+                  Post Project
+                </Link>
+                <Link className="hover:text-blue-600" to="/client/manage-projects">
+                  Manage Projects
+                </Link>
+              </>
             ) : null}
             {isAuthenticated ? (
               <button className="hover:text-blue-600" type="button" onClick={logout}>
@@ -53,15 +74,20 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/home" replace />} />
           <Route path="/home" element={<Home />} />
+          <Route path="/projects" element={<ProjectListPage />} />
+          <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
 
           <Route element={<PrivateRoute allowedRoles={["freelancer"]} />}>
             <Route path="/freelancer/profile" element={<FreelancerProfilePage />} />
+            <Route path="/freelancer/applications" element={<MyApplicationsPage />} />
           </Route>
 
           <Route element={<PrivateRoute allowedRoles={["client"]} />}>
             <Route path="/client/profile" element={<ClientProfilePage />} />
+            <Route path="/projects/post" element={<PostProjectPage />} />
+            <Route path="/client/manage-projects" element={<ManageProjectsPage />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

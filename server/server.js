@@ -5,6 +5,8 @@ const prisma = require("./lib/prisma");
 const authRoutes = require("./routes/auth");
 const profileRoutes = require("./routes/profile");
 const skillsRoutes = require("./routes/skills");
+const projectRoutes = require("./routes/projects");
+const applicationRoutes = require("./routes/applications");
 
 dotenv.config();
 
@@ -17,6 +19,8 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/skills", skillsRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api/applications", applicationRoutes);
 
 app.get("/health", async (_req, res) => {
   try {
