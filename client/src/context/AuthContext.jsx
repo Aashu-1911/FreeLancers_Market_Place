@@ -21,6 +21,7 @@ function decodeToken(token) {
     return {
       user_id: payload.user_id,
       role: payload.role,
+      username: payload.username || null,
       exp: payload.exp,
       first_name: null,
       last_name: null,
@@ -40,6 +41,7 @@ function mergeTokenAndUser(token, userData) {
 
   return {
     ...tokenData,
+    username: userData?.username || tokenData.username,
     first_name: userData?.first_name || tokenData.first_name,
     last_name: userData?.last_name || tokenData.last_name,
     email: userData?.email || tokenData.email,

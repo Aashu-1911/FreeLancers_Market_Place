@@ -22,6 +22,10 @@ function getRoleFromUser(user) {
 const registerValidation = [
   body("first_name").trim().notEmpty().withMessage("first_name is required"),
   body("last_name").trim().notEmpty().withMessage("last_name is required"),
+  body("username")
+    .trim()
+    .matches(/^[a-z0-9_]{3,30}$/)
+    .withMessage("username must be 3-30 characters and contain only lowercase letters, numbers, and underscores"),
   body("email").isEmail().withMessage("Valid email is required").normalizeEmail(),
   body("password").isLength({ min: 6 }).withMessage("password must be at least 6 characters"),
   body("role").isIn(["freelancer", "client"]).withMessage("role must be freelancer or client"),
@@ -41,6 +45,7 @@ router.post("/register", registerValidation, validateRequest, async (req, res) =
     const {
       first_name,
       last_name,
+      username,
       email,
       phone,
       city,
@@ -57,8 +62,8 @@ router.post("/register", registerValidation, validateRequest, async (req, res) =
       client_type,
     } = req.body;
 
-    if (!first_name || !last_name || !email || !password || !role) {
-      return res.status(400).json({ message: "first_name, last_name, email, password, and role are required" });
+    if (!first_name || !last_name || !username || !email || !password || !role) {
+      return res.status(400).json({ message: "first_name, last_name, username, email, password, and role are required" });
     }
 
     const normalizedRole = String(role).toLowerCase();
@@ -74,6 +79,7 @@ router.post("/register", registerValidation, validateRequest, async (req, res) =
         data: {
           first_name,
           last_name,
+          username: String(username).trim().toLowerCase(),
           email,
           phone: phone ?? null,
           city: city ?? null,
@@ -115,6 +121,7 @@ router.post("/register", registerValidation, validateRequest, async (req, res) =
     const token = signToken({
       user_id: result.user.user_id,
       role: normalizedRole,
+      username: result.user.username,
     });
 
     return res.status(201).json({
@@ -123,6 +130,7 @@ router.post("/register", registerValidation, validateRequest, async (req, res) =
         user_id: result.user.user_id,
         first_name: result.user.first_name,
         last_name: result.user.last_name,
+        username: result.user.username,
         email: result.user.email,
         role: normalizedRole,
       },
@@ -131,6 +139,12 @@ router.post("/register", registerValidation, validateRequest, async (req, res) =
     });
   } catch (error) {
     if (error.code === "P2002") {
+      const conflictTarget = Array.isArray(error.meta?.target) ? error.meta.target.join(",") : "";
+
+      if (conflictTarget.includes("username")) {
+        return res.status(409).json({ message: "Username already exists" });
+      }
+
       return res.status(409).json({ message: "Email already exists" });
     }
 
@@ -173,6 +187,7 @@ router.post("/login", loginValidation, validateRequest, async (req, res) => {
     const token = signToken({
       user_id: user.user_id,
       role,
+      username: user.username,
     });
 
     return res.status(200).json({
@@ -181,6 +196,7 @@ router.post("/login", loginValidation, validateRequest, async (req, res) => {
         user_id: user.user_id,
         first_name: user.first_name,
         last_name: user.last_name,
+        username: user.username,
         email: user.email,
         role,
       },

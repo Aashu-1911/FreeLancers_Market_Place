@@ -71,6 +71,7 @@ function FreelancerContractsPage() {
                 <p className="mt-1 text-sm text-slate-600">
                   Client: {contract.client.user.first_name} {contract.client.user.last_name}
                 </p>
+                <p className="mt-1 text-xs text-slate-500">@{contract.client.user.username || "user"}</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${statusClasses(contract.status)}`}>
                 {contract.status}
@@ -79,9 +80,16 @@ function FreelancerContractsPage() {
 
             <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-700">
               <p>Amount: {formatCurrency(contract.agreed_amount)}</p>
+              <p>Scope: {contract.contract_scope === "task_based" ? "Specific Task" : "Whole Project"}</p>
               <p>Start: {new Date(contract.start_date).toLocaleDateString()}</p>
               <p>End: {contract.end_date ? new Date(contract.end_date).toLocaleDateString() : "Not set"}</p>
+              <p>Client Email: {contract.client.user.email || "Not set"}</p>
+              <p>Client Phone: {contract.client.user.phone || "Not set"}</p>
             </div>
+
+            {contract.task_description ? (
+              <p className="mt-2 text-sm text-slate-600">Task: {contract.task_description}</p>
+            ) : null}
 
             <Link
               to={`/contracts/${contract.contract_id}`}

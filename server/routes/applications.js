@@ -113,9 +113,21 @@ router.get("/project/:project_id", authMiddleware, async (req, res) => {
       return res.status(403).json({ message: "You can view applicants only for your own projects" });
     }
 
+    const hiredContracts = await prisma.contract.findMany({
+      where: {
+        project_id: projectId,
+      },
+      select: {
+        freelancer_id: true,
+      },
+    });
+
+    const hiredFreelancerIds = [...new Set(hiredContracts.map((contract) => contract.freelancer_id))];
+
     const applications = await prisma.application.findMany({
       where: {
         project_id: projectId,
+        freelancer_id: hiredFreelancerIds.length > 0 ? { notIn: hiredFreelancerIds } : undefined,
       },
       include: {
         freelancer: {
@@ -125,7 +137,11 @@ router.get("/project/:project_id", authMiddleware, async (req, res) => {
                 user_id: true,
                 first_name: true,
                 last_name: true,
+                username: true,
                 email: true,
+                phone: true,
+                city: true,
+                pincode: true,
               },
             },
             skills: {
@@ -208,10 +224,6 @@ router.get("/freelancer/:freelancer_id", authMiddleware, async (req, res) => {
 
 router.delete("/:id", authMiddleware, async (req, res) => {
   try {
-    if (req.user.role !== "freelancer") {
-      return res.status(403).json({ message: "Only freelancers can withdraw applications" });
-    }
-
     const applicationId = parseId(req.params.id);
 
     if (!applicationId) {
@@ -223,7 +235,17 @@ router.delete("/:id", authMiddleware, async (req, res) => {
         application_id: applicationId,
       },
       include: {
-        freelancer: true,
+        freelancer: {
+          select: {
+            user_id: true,
+          },
+        },
+        project: {
+          select: {
+            project_id: true,
+            client_id: true,
+          },
+        },
       },
     });
 
@@ -231,19 +253,47 @@ router.delete("/:id", authMiddleware, async (req, res) => {
       return res.status(404).json({ message: "Application not found" });
     }
 
-    if (application.freelancer.user_id !== req.user.user_id) {
-      return res.status(403).json({ message: "You can withdraw only your own applications" });
+    if (req.user.role === "freelancer") {
+      if (application.freelancer.user_id !== req.user.user_id) {
+        return res.status(403).json({ message: "You can withdraw only your own applications" });
+      }
+
+      await prisma.application.delete({
+        where: {
+          application_id: applicationId,
+        },
+      });
+
+      return res.status(200).json({ message: "Application withdrawn successfully" });
     }
 
-    await prisma.application.delete({
-      where: {
-        application_id: applicationId,
-      },
-    });
+    if (req.user.role === "client") {
+      const client = await prisma.client.findUnique({
+        where: {
+          user_id: req.user.user_id,
+        },
+      });
 
-    return res.status(200).json({ message: "Application withdrawn successfully" });
+      if (!client) {
+        return res.status(404).json({ message: "Client profile not found" });
+      }
+
+      if (application.project.client_id !== client.client_id) {
+        return res.status(403).json({ message: "You can reject applicants only from your own projects" });
+      }
+
+      await prisma.application.delete({
+        where: {
+          application_id: applicationId,
+        },
+      });
+
+      return res.status(200).json({ message: "Applicant rejected and removed" });
+    }
+
+    return res.status(403).json({ message: "Only freelancers and clients can remove applications" });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to withdraw application", error: error.message });
+    return res.status(500).json({ message: "Failed to remove application", error: error.message });
   }
 });
 

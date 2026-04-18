@@ -69,7 +69,8 @@ function Navbar() {
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {isAuthenticated ? (
             <p className="text-slate-600">
-              {user?.first_name ? `${user.first_name} ${user.last_name || ""}`.trim() : `User #${user?.user_id}`}
+              {user?.username ? `@${user.username}` : "@user"}
+              {user?.first_name ? ` · ${`${user.first_name} ${user.last_name || ""}`.trim()}` : ""}
             </p>
           ) : null}
 

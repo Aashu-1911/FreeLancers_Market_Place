@@ -4,6 +4,8 @@ import api from "../lib/api.js";
 
 const initialForm = {
   agreed_amount: "",
+  contract_scope: "full_project",
+  task_description: "",
   start_date: "",
   end_date: "",
 };
@@ -42,6 +44,9 @@ function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId,
     if (!form.start_date) {
       nextErrors.start_date = "Start date is required.";
     }
+    if (form.contract_scope === "task_based" && !form.task_description.trim()) {
+      nextErrors.task_description = "Task details are required for a task-based contract.";
+    }
     if (form.end_date && new Date(form.end_date) < new Date(form.start_date)) {
       nextErrors.end_date = "End date cannot be earlier than start date.";
     }
@@ -60,6 +65,8 @@ function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId,
         freelancer_id: freelancer.freelancer_id,
         client_id: clientId,
         agreed_amount: Number(form.agreed_amount),
+        contract_scope: form.contract_scope,
+        task_description: form.task_description.trim() || null,
         start_date: form.start_date,
         end_date: form.end_date || null,
         status: "active",
@@ -84,6 +91,16 @@ function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId,
         <p className="mt-2 text-sm text-slate-600">
           Hiring {freelancer.user.first_name} {freelancer.user.last_name}
         </p>
+        <p className="text-sm text-slate-500">@{freelancer.user.username || "user"}</p>
+
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+          <p className="font-medium text-slate-900">Interview & Contact Details</p>
+          <p className="mt-1">Email: {freelancer.user.email || "Not provided"}</p>
+          <p className="mt-1">Phone: {freelancer.user.phone || "Not provided"}</p>
+          <p className="mt-2 text-xs text-slate-500">
+            Connect with the freelancer first, take the interview, and then confirm this contract.
+          </p>
+        </div>
 
         <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
           <label className="block text-sm font-medium text-slate-700">
@@ -102,6 +119,34 @@ function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId,
               required
             />
             {fieldErrors.agreed_amount ? <p className="mt-1 text-xs text-red-600">{fieldErrors.agreed_amount}</p> : null}
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700">
+            Contract Scope
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              name="contract_scope"
+              value={form.contract_scope}
+              onChange={handleChange}
+            >
+              <option value="full_project">Whole Project / Website</option>
+              <option value="task_based">Specific Task</option>
+            </select>
+          </label>
+
+          <label className="block text-sm font-medium text-slate-700">
+            Task Details
+            <textarea
+              className="mt-1 min-h-24 w-full rounded-md border border-slate-300 px-3 py-2"
+              name="task_description"
+              value={form.task_description}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, task_description: null }));
+              }}
+              placeholder="Describe the work to be done. For full project scope, you can keep this optional."
+            />
+            {fieldErrors.task_description ? <p className="mt-1 text-xs text-red-600">{fieldErrors.task_description}</p> : null}
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">

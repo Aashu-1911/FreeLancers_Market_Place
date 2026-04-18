@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import CreateContractModal from "../components/CreateContractModal.jsx";
+import FreelancerProfilePreviewModal from "../components/FreelancerProfilePreviewModal.jsx";
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -15,10 +16,13 @@ function ManageProjectsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [applicants, setApplicants] = useState([]);
   const [selectedApplicant, setSelectedApplicant] = useState(null);
+  const [profilePreviewFreelancer, setProfilePreviewFreelancer] = useState(null);
+  const [isProfilePreviewOpen, setIsProfilePreviewOpen] = useState(false);
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [projectStatusDrafts, setProjectStatusDrafts] = useState({});
   const [isSavingStatusById, setIsSavingStatusById] = useState({});
   const [isDeletingById, setIsDeletingById] = useState({});
+  const [isRejectingByApplicationId, setIsRejectingByApplicationId] = useState({});
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -134,6 +138,16 @@ function ManageProjectsPage() {
     setIsContractModalOpen(true);
   };
 
+  const handleOpenProfilePreview = (freelancer) => {
+    setProfilePreviewFreelancer(freelancer);
+    setIsProfilePreviewOpen(true);
+  };
+
+  const handleCloseProfilePreview = () => {
+    setProfilePreviewFreelancer(null);
+    setIsProfilePreviewOpen(false);
+  };
+
   const handleCloseContractModal = () => {
     setIsContractModalOpen(false);
     setSelectedApplicant(null);
@@ -141,6 +155,38 @@ function ManageProjectsPage() {
 
   const handleContractCreated = (contract) => {
     setSuccessMessage(`Contract #${contract.contract_id} created successfully.`);
+
+    const hiredFreelancerId = contract.freelancer_id || contract.freelancer?.freelancer_id;
+
+    if (hiredFreelancerId) {
+      setApplicants((prev) =>
+        prev.filter((application) => application.freelancer.freelancer_id !== hiredFreelancerId)
+      );
+    }
+  };
+
+  const handleRejectApplicant = async (application) => {
+    const confirmed = window.confirm(
+      `Reject ${application.freelancer.user.first_name} ${application.freelancer.user.last_name} for this project?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError("");
+      setSuccessMessage("");
+      setIsRejectingByApplicationId((prev) => ({ ...prev, [application.application_id]: true }));
+
+      await api.delete(`/api/applications/${application.application_id}`);
+      setApplicants((prev) => prev.filter((item) => item.application_id !== application.application_id));
+      setSuccessMessage("Applicant rejected and removed.");
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || "Failed to reject applicant");
+    } finally {
+      setIsRejectingByApplicationId((prev) => ({ ...prev, [application.application_id]: false }));
+    }
   };
 
   useEffect(() => {
@@ -259,24 +305,38 @@ function ManageProjectsPage() {
             <ul className="mt-4 space-y-3">
               {applicants.map((application) => (
                 <li key={application.application_id} className="rounded-lg border border-slate-200 p-4">
-                  <p className="font-semibold text-slate-900">
-                    {application.freelancer.user.first_name} {application.freelancer.user.last_name}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">College: {application.freelancer.college_name || "Not provided"}</p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Skills:{" "}
-                    {application.freelancer.skills.length > 0
-                      ? application.freelancer.skills.map((entry) => entry.skill.skill_name).join(", ")
-                      : "No skills assigned"}
-                  </p>
-
                   <button
                     type="button"
-                    onClick={() => handleOpenContractModal(application)}
-                    className="mt-3 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                    onClick={() => handleOpenProfilePreview(application.freelancer)}
+                    className="text-left"
                   >
-                    Hire
+                    <p className="text-base font-semibold text-slate-900 hover:text-blue-700 hover:underline">
+                      {application.freelancer.user.first_name} {application.freelancer.user.last_name}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">@{application.freelancer.user.username || "user"}</p>
                   </button>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Click on the name to view full freelancer profile (skills, contact, portfolio, resume), then hire.
+                  </p>
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenContractModal(application)}
+                      className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                    >
+                      Hire
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRejectApplicant(application)}
+                      disabled={Boolean(isRejectingByApplicationId[application.application_id])}
+                      className="rounded-md bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isRejectingByApplicationId[application.application_id] ? "Rejecting..." : "Reject"}
+                    </button>
+                  </div>
                 </li>
               ))}
               {selectedProjectId && applicants.length === 0 ? (
@@ -295,6 +355,12 @@ function ManageProjectsPage() {
         freelancer={selectedApplicant?.freelancer || null}
         clientId={clientId}
         onCreated={handleContractCreated}
+      />
+
+      <FreelancerProfilePreviewModal
+        isOpen={isProfilePreviewOpen}
+        freelancer={profilePreviewFreelancer}
+        onClose={handleCloseProfilePreview}
       />
     </section>
   );

@@ -102,6 +102,40 @@ function ProjectDetailPage() {
         <p>Applicants: {project._count?.applications || 0}</p>
       </div>
 
+      {user?.role === "freelancer" && Number(project.required_skills_count) > 0 ? (
+        <p className="mt-4 text-sm font-medium text-blue-700">
+          Your skill match: {project.matched_skills_count || 0}/{project.required_skills_count}
+        </p>
+      ) : null}
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Required skills</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(project.requiredSkills || []).map((entry) => (
+              <span key={entry.id} className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800">
+                {entry.skill.skill_name}
+              </span>
+            ))}
+            {(project.requiredSkills || []).length === 0 ? (
+              <span className="text-xs text-slate-500">No specific skills required.</span>
+            ) : null}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tech stack</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(project.tech_stack || []).map((entry) => (
+              <span key={`${project.project_id}-${entry}`} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                {entry}
+              </span>
+            ))}
+            {(project.tech_stack || []).length === 0 ? <span className="text-xs text-slate-500">Not specified.</span> : null}
+          </div>
+        </div>
+      </div>
+
       {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
 
       {isAuthenticated && user?.role === "freelancer" ? (

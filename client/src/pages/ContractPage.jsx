@@ -80,14 +80,28 @@ function ContractPage() {
         <div className="mt-5 grid gap-4 text-sm text-slate-700 sm:grid-cols-2">
           <p>Project: {contract.project.title}</p>
           <p>Agreed Amount: {formatCurrency(contract.agreed_amount)}</p>
+          <p>Scope: {contract.contract_scope === "task_based" ? "Specific Task" : "Whole Project"}</p>
           <p>
             Freelancer: {contract.freelancer.user.first_name} {contract.freelancer.user.last_name}
           </p>
           <p>
             Client: {contract.client.user.first_name} {contract.client.user.last_name}
           </p>
+          <p>Freelancer Username: @{contract.freelancer.user.username || "user"}</p>
+          <p>Client Username: @{contract.client.user.username || "user"}</p>
+          <p>Freelancer Email: {contract.freelancer.user.email || "Not set"}</p>
+          <p>Freelancer Phone: {contract.freelancer.user.phone || "Not set"}</p>
+          <p>Client Email: {contract.client.user.email || "Not set"}</p>
+          <p>Client Phone: {contract.client.user.phone || "Not set"}</p>
           <p>Start Date: {new Date(contract.start_date).toLocaleDateString()}</p>
           <p>End Date: {contract.end_date ? new Date(contract.end_date).toLocaleDateString() : "Not set"}</p>
+        </div>
+
+        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Task Description</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+            {contract.task_description || "No task description provided for this contract."}
+          </p>
         </div>
 
         {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}

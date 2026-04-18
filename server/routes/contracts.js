@@ -26,12 +26,15 @@ function parseDate(rawDate) {
 }
 
 const contractStatusValues = ["active", "completed", "cancelled"];
+const contractScopeValues = ["full_project", "task_based"];
 
 const createContractValidation = [
   body("project_id").isInt({ min: 1 }).withMessage("project_id must be a positive integer"),
   body("freelancer_id").isInt({ min: 1 }).withMessage("freelancer_id must be a positive integer"),
   body("client_id").isInt({ min: 1 }).withMessage("client_id must be a positive integer"),
   body("agreed_amount").isFloat({ gt: 0 }).withMessage("agreed_amount must be a positive number"),
+  body("contract_scope").optional().isIn(contractScopeValues).withMessage("Invalid contract_scope value"),
+  body("task_description").optional({ nullable: true }).trim(),
   body("start_date").isISO8601().withMessage("start_date must be a valid date"),
   body("end_date").optional({ nullable: true }).isISO8601().withMessage("end_date must be a valid date"),
   body("status").optional().isIn(contractStatusValues).withMessage("Invalid status value"),
@@ -52,6 +55,8 @@ router.post("/", authMiddleware, createContractValidation, validateRequest, asyn
       freelancer_id,
       client_id,
       agreed_amount,
+      contract_scope,
+      task_description,
       start_date,
       end_date,
       status,
@@ -61,6 +66,8 @@ router.post("/", authMiddleware, createContractValidation, validateRequest, asyn
     const freelancerId = parseId(freelancer_id);
     const clientId = parseId(client_id);
     const agreedAmount = parseAmount(agreed_amount);
+    const contractScope = contract_scope || "full_project";
+    const taskDescription = task_description ? String(task_description).trim() : null;
     const startDate = parseDate(start_date);
     const endDate = end_date ? parseDate(end_date) : null;
 
@@ -72,6 +79,14 @@ router.post("/", authMiddleware, createContractValidation, validateRequest, asyn
 
     if (end_date && !endDate) {
       return res.status(400).json({ message: "Invalid end_date" });
+    }
+
+    if (!contractScopeValues.includes(contractScope)) {
+      return res.status(400).json({ message: "Invalid contract_scope value" });
+    }
+
+    if (contractScope === "task_based" && !taskDescription) {
+      return res.status(400).json({ message: "task_description is required for task_based contracts" });
     }
 
     const authClient = await prisma.client.findUnique({
@@ -135,53 +150,72 @@ router.post("/", authMiddleware, createContractValidation, validateRequest, asyn
       return res.status(409).json({ message: "Contract already exists for this project and freelancer" });
     }
 
-    const createdContract = await prisma.contract.create({
-      data: {
-        project_id: projectId,
-        freelancer_id: freelancerId,
-        client_id: clientId,
-        agreed_amount: agreedAmount,
-        start_date: startDate,
-        end_date: endDate,
-        status: status || "active",
-      },
-      include: {
-        project: true,
-        freelancer: {
-          include: {
-            user: {
-              select: {
-                user_id: true,
-                first_name: true,
-                last_name: true,
-                email: true,
+    const createdContract = await prisma.$transaction(async (tx) => {
+      const newContract = await tx.contract.create({
+        data: {
+          project_id: projectId,
+          freelancer_id: freelancerId,
+          client_id: clientId,
+          agreed_amount: agreedAmount,
+          contract_scope: contractScope,
+          task_description: taskDescription,
+          start_date: startDate,
+          end_date: endDate,
+          status: status || "active",
+        },
+        include: {
+          project: true,
+          freelancer: {
+            include: {
+              user: {
+                select: {
+                  user_id: true,
+                  first_name: true,
+                  last_name: true,
+                  username: true,
+                  email: true,
+                  phone: true,
+                  city: true,
+                },
               },
-            },
-            skills: {
-              include: {
-                skill: {
-                  select: {
-                    skill_id: true,
-                    skill_name: true,
+              skills: {
+                include: {
+                  skill: {
+                    select: {
+                      skill_id: true,
+                      skill_name: true,
+                    },
                   },
                 },
               },
             },
           },
-        },
-        client: {
-          include: {
-            user: {
-              select: {
-                user_id: true,
-                first_name: true,
-                last_name: true,
-                email: true,
+          client: {
+            include: {
+              user: {
+                select: {
+                  user_id: true,
+                  first_name: true,
+                  last_name: true,
+                  username: true,
+                  email: true,
+                  phone: true,
+                  city: true,
+                },
               },
             },
           },
         },
-      },
+      });
+
+      await tx.application.deleteMany({
+        where: {
+          project_id: projectId,
+          freelancer_id: freelancerId,
+        },
+      });
+
+      return newContract;
     });
 
     return res.status(201).json(createdContract);
@@ -225,7 +259,10 @@ router.get("/freelancer/:freelancer_id", authMiddleware, async (req, res) => {
                 user_id: true,
                 first_name: true,
                 last_name: true,
+                username: true,
                 email: true,
+                phone: true,
+                city: true,
               },
             },
           },
@@ -277,7 +314,10 @@ router.get("/client/:client_id", authMiddleware, async (req, res) => {
                 user_id: true,
                 first_name: true,
                 last_name: true,
+                username: true,
                 email: true,
+                phone: true,
+                city: true,
               },
             },
             skills: {
@@ -325,8 +365,10 @@ router.get("/:id", authMiddleware, async (req, res) => {
                 user_id: true,
                 first_name: true,
                 last_name: true,
+                username: true,
                 email: true,
                 phone: true,
+                city: true,
               },
             },
             skills: {
@@ -348,8 +390,10 @@ router.get("/:id", authMiddleware, async (req, res) => {
                 user_id: true,
                 first_name: true,
                 last_name: true,
+                username: true,
                 email: true,
                 phone: true,
+                city: true,
               },
             },
           },
@@ -430,7 +474,10 @@ router.put("/:id/status", authMiddleware, updateContractStatusValidation, valida
               select: {
                 first_name: true,
                 last_name: true,
+                username: true,
                 email: true,
+                phone: true,
+                city: true,
               },
             },
           },
@@ -441,7 +488,10 @@ router.put("/:id/status", authMiddleware, updateContractStatusValidation, valida
               select: {
                 first_name: true,
                 last_name: true,
+                username: true,
                 email: true,
+                phone: true,
+                city: true,
               },
             },
           },

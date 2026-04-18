@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 const initialFormState = {
   first_name: "",
   last_name: "",
+  username: "",
   email: "",
   phone: "",
   city: "",
@@ -32,6 +33,10 @@ function RegisterPage() {
 
     if (!form.last_name.trim()) {
       nextErrors.last_name = "Last name is required.";
+    }
+
+    if (!/^[a-z0-9_]{3,30}$/.test(form.username.trim())) {
+      nextErrors.username = "Username must be 3-30 characters and use only lowercase letters, numbers, and underscores.";
     }
 
     if (!/^\S+@\S+\.\S+$/.test(form.email)) {
@@ -117,6 +122,22 @@ function RegisterPage() {
             {fieldErrors.last_name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.last_name}</p> : null}
           </label>
         </div>
+
+        <label className="block text-sm font-medium text-slate-700">
+          Username
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            name="username"
+            value={form.username}
+            onChange={(event) => {
+              handleChange(event);
+              setFieldErrors((prev) => ({ ...prev, username: null }));
+            }}
+            placeholder="e.g. harsh_dev"
+            required
+          />
+          {fieldErrors.username ? <p className="mt-1 text-xs text-red-600">{fieldErrors.username}</p> : null}
+        </label>
 
         <label className="block text-sm font-medium text-slate-700">
           Email

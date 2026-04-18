@@ -11,6 +11,7 @@ model User {
   user_id      Int        @id @default(autoincrement())
   first_name   String
   last_name    String
+  username     String     @unique
   email        String     @unique
   phone        String?
   city         String?
@@ -52,6 +53,7 @@ model Skill {
   skill_name     String            @unique
   description    String?
   freelancers    FreelancerSkill[]
+  projectSkills  ProjectSkill[]
 }
 
 model FreelancerSkill {
@@ -70,12 +72,24 @@ model Project {
   title           String
   description     String
   budget          Decimal       @db.Decimal(12, 2)
+  tech_stack      String[]      @default([])
   deadline        DateTime
   posted_date     DateTime      @default(now())
   project_status  String        @default("open")
   client          Client        @relation(fields: [client_id], references: [client_id], onDelete: Cascade)
+  requiredSkills  ProjectSkill[]
   applications    Application[]
   contracts       Contract[]
+}
+
+model ProjectSkill {
+  id          Int      @id @default(autoincrement())
+  project_id  Int
+  skill_id    Int
+  project     Project  @relation(fields: [project_id], references: [project_id], onDelete: Cascade)
+  skill       Skill    @relation(fields: [skill_id], references: [skill_id], onDelete: Cascade)
+
+  @@unique([project_id, skill_id])
 }
 
 model Application {
@@ -95,6 +109,8 @@ model Contract {
   freelancer_id   Int
   client_id       Int
   agreed_amount   Decimal     @db.Decimal(12, 2)
+  contract_scope  String      @default("full_project")
+  task_description String?
   start_date      DateTime
   end_date        DateTime?
   status          String      @default("active")
