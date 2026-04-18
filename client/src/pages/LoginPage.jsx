@@ -22,7 +22,7 @@ function LoginPage() {
       const response = await api.post("/api/auth/login", { email, password });
       login(response.data.token);
 
-      const fallbackPath = response.data?.user?.role === "client" ? "/client/profile" : "/freelancer/profile";
+      const fallbackPath = response.data?.user?.role === "client" ? "/dashboard/client" : "/dashboard/freelancer";
       const redirectPath = location.state?.from?.pathname || fallbackPath;
       navigate(redirectPath, { replace: true });
     } catch (requestError) {

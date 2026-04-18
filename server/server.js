@@ -7,6 +7,10 @@ const profileRoutes = require("./routes/profile");
 const skillsRoutes = require("./routes/skills");
 const projectRoutes = require("./routes/projects");
 const applicationRoutes = require("./routes/applications");
+const contractRoutes = require("./routes/contracts");
+const paymentRoutes = require("./routes/payments");
+const reviewRoutes = require("./routes/reviews");
+const statsRoutes = require("./routes/stats");
 
 dotenv.config();
 
@@ -21,6 +25,10 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/skills", skillsRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/applications", applicationRoutes);
+app.use("/api/contracts", contractRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/reviews", reviewRoutes);
+app.use("/api/stats", statsRoutes);
 
 app.get("/health", async (_req, res) => {
   try {

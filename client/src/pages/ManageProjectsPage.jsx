@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import CreateContractModal from "../components/CreateContractModal.jsx";
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
@@ -9,9 +10,12 @@ function formatCurrency(value) {
 
 function ManageProjectsPage() {
   const { user } = useAuth();
+  const [clientId, setClientId] = useState(null);
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const [applicants, setApplicants] = useState([]);
+  const [selectedApplicant, setSelectedApplicant] = useState(null);
+  const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [projectStatusDrafts, setProjectStatusDrafts] = useState({});
   const [isSavingStatusById, setIsSavingStatusById] = useState({});
   const [isDeletingById, setIsDeletingById] = useState({});
@@ -22,9 +26,10 @@ function ManageProjectsPage() {
 
   const loadProjects = async () => {
     const profileResponse = await api.get(`/api/profile/client/${user.user_id}`);
-    const clientId = profileResponse.data.client_id;
+    const resolvedClientId = profileResponse.data.client_id;
+    setClientId(resolvedClientId);
 
-    const projectsResponse = await api.get(`/api/projects/client/${clientId}`);
+    const projectsResponse = await api.get(`/api/projects/client/${resolvedClientId}`);
     setProjects(projectsResponse.data);
 
     const statusMap = projectsResponse.data.reduce((acc, project) => {
@@ -122,6 +127,20 @@ function ManageProjectsPage() {
     } finally {
       setIsApplicantsLoading(false);
     }
+  };
+
+  const handleOpenContractModal = (application) => {
+    setSelectedApplicant(application);
+    setIsContractModalOpen(true);
+  };
+
+  const handleCloseContractModal = () => {
+    setIsContractModalOpen(false);
+    setSelectedApplicant(null);
+  };
+
+  const handleContractCreated = (contract) => {
+    setSuccessMessage(`Contract #${contract.contract_id} created successfully.`);
   };
 
   useEffect(() => {
@@ -250,6 +269,14 @@ function ManageProjectsPage() {
                       ? application.freelancer.skills.map((entry) => entry.skill.skill_name).join(", ")
                       : "No skills assigned"}
                   </p>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenContractModal(application)}
+                    className="mt-3 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                  >
+                    Hire
+                  </button>
                 </li>
               ))}
               {selectedProjectId && applicants.length === 0 ? (
@@ -260,6 +287,15 @@ function ManageProjectsPage() {
           ) : null}
         </div>
       </div>
+
+      <CreateContractModal
+        isOpen={isContractModalOpen}
+        onClose={handleCloseContractModal}
+        projectId={selectedProjectId}
+        freelancer={selectedApplicant?.freelancer || null}
+        clientId={clientId}
+        onCreated={handleContractCreated}
+      />
     </section>
   );
 }
