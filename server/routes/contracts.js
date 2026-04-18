@@ -1,6 +1,8 @@
 const express = require("express");
+const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
+const validateRequest = require("../middleware/validateRequest");
 
 const router = express.Router();
 
@@ -23,7 +25,23 @@ function parseDate(rawDate) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-router.post("/", authMiddleware, async (req, res) => {
+const contractStatusValues = ["active", "completed", "cancelled"];
+
+const createContractValidation = [
+  body("project_id").isInt({ min: 1 }).withMessage("project_id must be a positive integer"),
+  body("freelancer_id").isInt({ min: 1 }).withMessage("freelancer_id must be a positive integer"),
+  body("client_id").isInt({ min: 1 }).withMessage("client_id must be a positive integer"),
+  body("agreed_amount").isFloat({ gt: 0 }).withMessage("agreed_amount must be a positive number"),
+  body("start_date").isISO8601().withMessage("start_date must be a valid date"),
+  body("end_date").optional({ nullable: true }).isISO8601().withMessage("end_date must be a valid date"),
+  body("status").optional().isIn(contractStatusValues).withMessage("Invalid status value"),
+];
+
+const updateContractStatusValidation = [
+  body("status").isIn(contractStatusValues).withMessage("Invalid status value"),
+];
+
+router.post("/", authMiddleware, createContractValidation, validateRequest, async (req, res) => {
   try {
     if (req.user.role !== "client") {
       return res.status(403).json({ message: "Only clients can create contracts" });
@@ -361,7 +379,7 @@ router.get("/:id", authMiddleware, async (req, res) => {
   }
 });
 
-router.put("/:id/status", authMiddleware, async (req, res) => {
+router.put("/:id/status", authMiddleware, updateContractStatusValidation, validateRequest, async (req, res) => {
   try {
     const contractId = parseId(req.params.id);
     const nextStatus = req.body.status;

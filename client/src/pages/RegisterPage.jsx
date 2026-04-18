@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -17,9 +18,33 @@ const initialFormState = {
 function RegisterPage() {
   const [form, setForm] = useState(initialFormState);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
+
+  const validate = () => {
+    const nextErrors = {};
+
+    if (!form.first_name.trim()) {
+      nextErrors.first_name = "First name is required.";
+    }
+
+    if (!form.last_name.trim()) {
+      nextErrors.last_name = "Last name is required.";
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(form.email)) {
+      nextErrors.email = "Enter a valid email address.";
+    }
+
+    if (!form.password || form.password.length < 6) {
+      nextErrors.password = "Password must be at least 6 characters.";
+    }
+
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -28,12 +53,18 @@ function RegisterPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (!validate()) {
+      return;
+    }
+
     setError("");
     setIsSubmitting(true);
 
     try {
       const response = await api.post("/api/auth/register", form);
-      login(response.data.token);
+      login(response.data.token, response.data.user);
+      toast.success("Registration successful.");
 
       if (form.role === "freelancer") {
         navigate("/freelancer/profile", { replace: true });
@@ -41,7 +72,9 @@ function RegisterPage() {
         navigate("/client/profile", { replace: true });
       }
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Registration failed");
+      const message = requestError.response?.data?.message || "Registration failed";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -60,9 +93,13 @@ function RegisterPage() {
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
               name="first_name"
               value={form.first_name}
-              onChange={handleChange}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, first_name: null }));
+              }}
               required
             />
+            {fieldErrors.first_name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.first_name}</p> : null}
           </label>
 
           <label className="text-sm font-medium text-slate-700">
@@ -71,9 +108,13 @@ function RegisterPage() {
               className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
               name="last_name"
               value={form.last_name}
-              onChange={handleChange}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, last_name: null }));
+              }}
               required
             />
+            {fieldErrors.last_name ? <p className="mt-1 text-xs text-red-600">{fieldErrors.last_name}</p> : null}
           </label>
         </div>
 
@@ -84,9 +125,13 @@ function RegisterPage() {
             name="email"
             type="email"
             value={form.email}
-            onChange={handleChange}
+            onChange={(event) => {
+              handleChange(event);
+              setFieldErrors((prev) => ({ ...prev, email: null }));
+            }}
             required
           />
+          {fieldErrors.email ? <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p> : null}
         </label>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -129,10 +174,14 @@ function RegisterPage() {
               name="password"
               type="password"
               value={form.password}
-              onChange={handleChange}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, password: null }));
+              }}
               required
               minLength={6}
             />
+            {fieldErrors.password ? <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p> : null}
           </label>
 
           <label className="text-sm font-medium text-slate-700">

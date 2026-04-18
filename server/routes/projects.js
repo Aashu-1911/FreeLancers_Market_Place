@@ -1,6 +1,8 @@
 const express = require("express");
+const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
+const validateRequest = require("../middleware/validateRequest");
 
 const router = express.Router();
 
@@ -29,7 +31,25 @@ function pickDefined(source, keys) {
   }, {});
 }
 
-router.post("/", authMiddleware, async (req, res) => {
+const projectStatusValues = ["open", "in_progress", "closed"];
+
+const createProjectValidation = [
+  body("title").trim().notEmpty().withMessage("title is required"),
+  body("description").trim().notEmpty().withMessage("description is required"),
+  body("budget").isFloat({ gt: 0 }).withMessage("budget must be a positive number"),
+  body("deadline").isISO8601().withMessage("deadline must be a valid date"),
+  body("project_status").optional().isIn(projectStatusValues).withMessage("Invalid project_status"),
+];
+
+const updateProjectValidation = [
+  body("title").optional().trim().notEmpty().withMessage("title cannot be empty"),
+  body("description").optional().trim().notEmpty().withMessage("description cannot be empty"),
+  body("budget").optional().isFloat({ gt: 0 }).withMessage("budget must be a positive number"),
+  body("deadline").optional().isISO8601().withMessage("deadline must be a valid date"),
+  body("project_status").optional().isIn(projectStatusValues).withMessage("Invalid project_status"),
+];
+
+router.post("/", authMiddleware, createProjectValidation, validateRequest, async (req, res) => {
   try {
     if (req.user.role !== "client") {
       return res.status(403).json({ message: "Only clients can post projects" });
@@ -211,7 +231,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-router.put("/:id", authMiddleware, async (req, res) => {
+router.put("/:id", authMiddleware, updateProjectValidation, validateRequest, async (req, res) => {
   try {
     if (req.user.role !== "client") {
       return res.status(403).json({ message: "Only clients can update projects" });

@@ -1,6 +1,8 @@
 const express = require("express");
+const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
+const validateRequest = require("../middleware/validateRequest");
 
 const router = express.Router();
 
@@ -8,6 +10,16 @@ function parseId(rawId) {
   const parsed = Number(rawId);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
+
+const createSkillValidation = [
+  body("skill_name").trim().notEmpty().withMessage("skill_name is required"),
+  body("description").optional({ nullable: true }).trim(),
+];
+
+const assignSkillValidation = [
+  body("freelancer_id").isInt({ min: 1 }).withMessage("freelancer_id must be a positive integer"),
+  body("skill_id").isInt({ min: 1 }).withMessage("skill_id must be a positive integer"),
+];
 
 router.get("/", async (_req, res) => {
   try {
@@ -23,7 +35,7 @@ router.get("/", async (_req, res) => {
   }
 });
 
-router.post("/", authMiddleware, async (req, res) => {
+router.post("/", authMiddleware, createSkillValidation, validateRequest, async (req, res) => {
   try {
     const { skill_name, description } = req.body;
 
@@ -48,7 +60,7 @@ router.post("/", authMiddleware, async (req, res) => {
   }
 });
 
-router.post("/assign", authMiddleware, async (req, res) => {
+router.post("/assign", authMiddleware, assignSkillValidation, validateRequest, async (req, res) => {
   try {
     const freelancerId = parseId(req.body.freelancer_id);
     const skillId = parseId(req.body.skill_id);

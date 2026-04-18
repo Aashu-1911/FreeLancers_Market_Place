@@ -1,7 +1,9 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
+const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const { signToken } = require("../utils/jwt");
+const validateRequest = require("../middleware/validateRequest");
 
 const router = express.Router();
 
@@ -17,7 +19,24 @@ function getRoleFromUser(user) {
   return null;
 }
 
-router.post("/register", async (req, res) => {
+const registerValidation = [
+  body("first_name").trim().notEmpty().withMessage("first_name is required"),
+  body("last_name").trim().notEmpty().withMessage("last_name is required"),
+  body("email").isEmail().withMessage("Valid email is required").normalizeEmail(),
+  body("password").isLength({ min: 6 }).withMessage("password must be at least 6 characters"),
+  body("role").isIn(["freelancer", "client"]).withMessage("role must be freelancer or client"),
+  body("phone").optional({ nullable: true }).trim(),
+  body("city").optional({ nullable: true }).trim(),
+  body("pincode").optional({ nullable: true }).trim(),
+  body("year_of_study").optional({ nullable: true }).isInt({ min: 1 }).withMessage("year_of_study must be a positive integer"),
+];
+
+const loginValidation = [
+  body("email").isEmail().withMessage("Valid email is required").normalizeEmail(),
+  body("password").notEmpty().withMessage("password is required"),
+];
+
+router.post("/register", registerValidation, validateRequest, async (req, res) => {
   try {
     const {
       first_name,
@@ -119,7 +138,7 @@ router.post("/register", async (req, res) => {
   }
 });
 
-router.post("/login", async (req, res) => {
+router.post("/login", loginValidation, validateRequest, async (req, res) => {
   try {
     const { email, password } = req.body;
 

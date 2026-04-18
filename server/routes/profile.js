@@ -1,6 +1,8 @@
 const express = require("express");
+const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
+const validateRequest = require("../middleware/validateRequest");
 
 const router = express.Router();
 
@@ -17,6 +19,23 @@ function pickDefined(source, keys) {
     return acc;
   }, {});
 }
+
+const commonProfileValidation = [
+  body("first_name").optional().trim().notEmpty().withMessage("first_name cannot be empty"),
+  body("last_name").optional().trim().notEmpty().withMessage("last_name cannot be empty"),
+  body("email").optional().isEmail().withMessage("email must be valid").normalizeEmail(),
+  body("phone").optional({ nullable: true }).trim(),
+  body("city").optional({ nullable: true }).trim(),
+  body("pincode").optional({ nullable: true }).trim(),
+];
+
+const freelancerProfileValidation = [
+  ...commonProfileValidation,
+  body("year_of_study").optional({ nullable: true }).isInt({ min: 1 }).withMessage("year_of_study must be a positive integer"),
+  body("availability").optional().isBoolean().withMessage("availability must be a boolean"),
+];
+
+const clientProfileValidation = [...commonProfileValidation];
 
 router.get("/freelancer/:id", authMiddleware, async (req, res) => {
   try {
@@ -61,7 +80,7 @@ router.get("/freelancer/:id", authMiddleware, async (req, res) => {
   }
 });
 
-router.put("/freelancer/:id", authMiddleware, async (req, res) => {
+router.put("/freelancer/:id", authMiddleware, freelancerProfileValidation, validateRequest, async (req, res) => {
   try {
     const id = parseId(req.params.id);
 
@@ -188,7 +207,7 @@ router.get("/client/:id", authMiddleware, async (req, res) => {
   }
 });
 
-router.put("/client/:id", authMiddleware, async (req, res) => {
+router.put("/client/:id", authMiddleware, clientProfileValidation, validateRequest, async (req, res) => {
   try {
     const id = parseId(req.params.id);
 

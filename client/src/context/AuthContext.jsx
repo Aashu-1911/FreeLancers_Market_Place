@@ -22,24 +22,58 @@ function decodeToken(token) {
       user_id: payload.user_id,
       role: payload.role,
       exp: payload.exp,
+      first_name: null,
+      last_name: null,
+      email: null,
     };
   } catch (_error) {
     return null;
   }
 }
 
+function mergeTokenAndUser(token, userData) {
+  const tokenData = decodeToken(token);
+
+  if (!tokenData) {
+    return null;
+  }
+
+  return {
+    ...tokenData,
+    first_name: userData?.first_name || tokenData.first_name,
+    last_name: userData?.last_name || tokenData.last_name,
+    email: userData?.email || tokenData.email,
+  };
+}
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem("token"));
-  const [user, setUser] = useState(() => decodeToken(localStorage.getItem("token")));
+  const [user, setUser] = useState(() => {
+    const existingToken = localStorage.getItem("token");
+    const savedUserRaw = localStorage.getItem("auth_user");
+    let savedUser = null;
 
-  const login = (newToken) => {
+    try {
+      savedUser = savedUserRaw ? JSON.parse(savedUserRaw) : null;
+    } catch (_error) {
+      savedUser = null;
+    }
+
+    return mergeTokenAndUser(existingToken, savedUser);
+  });
+
+  const login = (newToken, userData = null) => {
     localStorage.setItem("token", newToken);
+    if (userData) {
+      localStorage.setItem("auth_user", JSON.stringify(userData));
+    }
     setToken(newToken);
-    setUser(decodeToken(newToken));
+    setUser(mergeTokenAndUser(newToken, userData));
   };
 
   const logout = () => {
     localStorage.removeItem("token");
+    localStorage.removeItem("auth_user");
     setToken(null);
     setUser(null);
   };

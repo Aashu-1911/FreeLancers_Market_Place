@@ -1,6 +1,8 @@
 const express = require("express");
+const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
+const validateRequest = require("../middleware/validateRequest");
 
 const router = express.Router();
 
@@ -9,7 +11,12 @@ function parseId(rawId) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-router.post("/", authMiddleware, async (req, res) => {
+const createApplicationValidation = [
+  body("project_id").isInt({ min: 1 }).withMessage("project_id must be a positive integer"),
+  body("freelancer_id").isInt({ min: 1 }).withMessage("freelancer_id must be a positive integer"),
+];
+
+router.post("/", authMiddleware, createApplicationValidation, validateRequest, async (req, res) => {
   try {
     if (req.user.role !== "freelancer") {
       return res.status(403).json({ message: "Only freelancers can apply to projects" });

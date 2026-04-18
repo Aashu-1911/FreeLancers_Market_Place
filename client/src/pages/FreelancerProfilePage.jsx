@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -12,6 +13,7 @@ function FreelancerProfilePage() {
   const [skills, setSkills] = useState([]);
   const [selectedSkillId, setSelectedSkillId] = useState("");
   const [form, setForm] = useState({});
+  const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -55,7 +57,9 @@ function FreelancerProfilePage() {
         setError("");
         await loadData();
       } catch (requestError) {
-        setError(requestError.response?.data?.message || "Failed to load freelancer profile");
+        const message = requestError.response?.data?.message || "Failed to load freelancer profile";
+        setError(message);
+        toast.error(message);
       }
     };
 
@@ -72,6 +76,22 @@ function FreelancerProfilePage() {
 
   const handleSave = async (event) => {
     event.preventDefault();
+
+    const nextErrors = {};
+    if (!form.first_name?.trim()) {
+      nextErrors.first_name = "First name is required.";
+    }
+    if (!form.last_name?.trim()) {
+      nextErrors.last_name = "Last name is required.";
+    }
+    if (!/^\S+@\S+\.\S+$/.test(form.email || "")) {
+      nextErrors.email = "Enter a valid email address.";
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
     if (!profile?.freelancer_id) {
       return;
     }
@@ -94,8 +114,11 @@ function FreelancerProfilePage() {
 
       const response = await api.put(`/api/profile/freelancer/${profile.freelancer_id}`, payload);
       setProfile(response.data);
+      toast.success("Profile updated successfully.");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Failed to update profile");
+      const message = requestError.response?.data?.message || "Failed to update profile";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -114,8 +137,11 @@ function FreelancerProfilePage() {
       });
       setSelectedSkillId("");
       await loadData();
+      toast.success("Skill assigned successfully.");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Failed to assign skill");
+      const message = requestError.response?.data?.message || "Failed to assign skill";
+      setError(message);
+      toast.error(message);
     }
   };
 
@@ -133,8 +159,11 @@ function FreelancerProfilePage() {
         },
       });
       await loadData();
+      toast.success("Skill removed successfully.");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Failed to remove skill");
+      const message = requestError.response?.data?.message || "Failed to remove skill";
+      setError(message);
+      toast.error(message);
     }
   };
 
@@ -156,8 +185,12 @@ function FreelancerProfilePage() {
                 className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
                 name={field}
                 value={form[field] || ""}
-                onChange={handleChange}
+                onChange={(event) => {
+                  handleChange(event);
+                  setFieldErrors((prev) => ({ ...prev, [field]: null }));
+                }}
               />
+              {fieldErrors[field] ? <p className="mt-1 text-xs text-red-600">{fieldErrors[field]}</p> : null}
             </label>
           ))}
 

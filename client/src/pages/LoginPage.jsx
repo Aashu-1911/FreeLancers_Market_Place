@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
@@ -7,26 +8,52 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
 
+  const validate = () => {
+    const nextErrors = {};
+
+    if (!email.trim()) {
+      nextErrors.email = "Email is required.";
+    } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+      nextErrors.email = "Enter a valid email address.";
+    }
+
+    if (!password) {
+      nextErrors.password = "Password is required.";
+    }
+
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (!validate()) {
+      return;
+    }
+
     setError("");
     setIsSubmitting(true);
 
     try {
       const response = await api.post("/api/auth/login", { email, password });
-      login(response.data.token);
+      login(response.data.token, response.data.user);
+      toast.success("Logged in successfully.");
 
       const fallbackPath = response.data?.user?.role === "client" ? "/dashboard/client" : "/dashboard/freelancer";
       const redirectPath = location.state?.from?.pathname || fallbackPath;
       navigate(redirectPath, { replace: true });
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Login failed");
+      const message = requestError.response?.data?.message || "Login failed";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -44,9 +71,13 @@ function LoginPage() {
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
             type="email"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setFieldErrors((prev) => ({ ...prev, email: null }));
+            }}
             required
           />
+          {fieldErrors.email ? <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p> : null}
         </label>
 
         <label className="block text-sm font-medium text-slate-700">
@@ -55,9 +86,13 @@ function LoginPage() {
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
             type="password"
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              setFieldErrors((prev) => ({ ...prev, password: null }));
+            }}
             required
           />
+          {fieldErrors.password ? <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p> : null}
         </label>
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}

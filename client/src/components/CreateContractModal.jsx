@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import api from "../lib/api.js";
 
 const initialForm = {
@@ -10,12 +11,14 @@ const initialForm = {
 function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId, onCreated }) {
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setForm(initialForm);
       setError("");
+      setFieldErrors({});
       setIsSubmitting(false);
     }
   }, [isOpen]);
@@ -31,6 +34,23 @@ function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId,
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    const nextErrors = {};
+    if (!form.agreed_amount || Number(form.agreed_amount) <= 0) {
+      nextErrors.agreed_amount = "Amount must be a positive number.";
+    }
+    if (!form.start_date) {
+      nextErrors.start_date = "Start date is required.";
+    }
+    if (form.end_date && new Date(form.end_date) < new Date(form.start_date)) {
+      nextErrors.end_date = "End date cannot be earlier than start date.";
+    }
+
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
     setError("");
     setIsSubmitting(true);
 
@@ -46,9 +66,12 @@ function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId,
       });
 
       onCreated(response.data);
+      toast.success("Contract created successfully.");
       onClose();
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Failed to create contract");
+      const message = requestError.response?.data?.message || "Failed to create contract";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -72,9 +95,13 @@ function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId,
               min="1"
               step="0.01"
               value={form.agreed_amount}
-              onChange={handleChange}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, agreed_amount: null }));
+              }}
               required
             />
+            {fieldErrors.agreed_amount ? <p className="mt-1 text-xs text-red-600">{fieldErrors.agreed_amount}</p> : null}
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -85,9 +112,13 @@ function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId,
                 name="start_date"
                 type="date"
                 value={form.start_date}
-                onChange={handleChange}
+                onChange={(event) => {
+                  handleChange(event);
+                  setFieldErrors((prev) => ({ ...prev, start_date: null }));
+                }}
                 required
               />
+              {fieldErrors.start_date ? <p className="mt-1 text-xs text-red-600">{fieldErrors.start_date}</p> : null}
             </label>
 
             <label className="text-sm font-medium text-slate-700">
@@ -97,8 +128,12 @@ function CreateContractModal({ isOpen, onClose, projectId, freelancer, clientId,
                 name="end_date"
                 type="date"
                 value={form.end_date}
-                onChange={handleChange}
+                onChange={(event) => {
+                  handleChange(event);
+                  setFieldErrors((prev) => ({ ...prev, end_date: null }));
+                }}
               />
+              {fieldErrors.end_date ? <p className="mt-1 text-xs text-red-600">{fieldErrors.end_date}</p> : null}
             </label>
           </div>
 

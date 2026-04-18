@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import api from "../lib/api.js";
 
 const initialState = {
@@ -13,8 +14,32 @@ const initialState = {
 function PostProjectPage() {
   const [form, setForm] = useState(initialState);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+
+  const validate = () => {
+    const nextErrors = {};
+
+    if (!form.title.trim()) {
+      nextErrors.title = "Title is required.";
+    }
+
+    if (!form.description.trim()) {
+      nextErrors.description = "Description is required.";
+    }
+
+    if (!form.budget || Number(form.budget) <= 0) {
+      nextErrors.budget = "Budget must be a positive number.";
+    }
+
+    if (!form.deadline) {
+      nextErrors.deadline = "Deadline is required.";
+    }
+
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -23,6 +48,11 @@ function PostProjectPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (!validate()) {
+      return;
+    }
+
     setError("");
     setIsSubmitting(true);
 
@@ -32,9 +62,12 @@ function PostProjectPage() {
         budget: Number(form.budget),
       });
 
+      toast.success("Project posted successfully.");
       navigate("/client/manage-projects", { replace: true });
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Failed to post project");
+      const message = requestError.response?.data?.message || "Failed to post project";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -52,9 +85,13 @@ function PostProjectPage() {
             className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
             name="title"
             value={form.title}
-            onChange={handleChange}
+            onChange={(event) => {
+              handleChange(event);
+              setFieldErrors((prev) => ({ ...prev, title: null }));
+            }}
             required
           />
+          {fieldErrors.title ? <p className="mt-1 text-xs text-red-600">{fieldErrors.title}</p> : null}
         </label>
 
         <label className="block text-sm font-medium text-slate-700">
@@ -63,9 +100,13 @@ function PostProjectPage() {
             className="mt-1 min-h-32 w-full rounded-md border border-slate-300 px-3 py-2"
             name="description"
             value={form.description}
-            onChange={handleChange}
+            onChange={(event) => {
+              handleChange(event);
+              setFieldErrors((prev) => ({ ...prev, description: null }));
+            }}
             required
           />
+          {fieldErrors.description ? <p className="mt-1 text-xs text-red-600">{fieldErrors.description}</p> : null}
         </label>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -78,9 +119,13 @@ function PostProjectPage() {
               min="1"
               step="0.01"
               value={form.budget}
-              onChange={handleChange}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, budget: null }));
+              }}
               required
             />
+            {fieldErrors.budget ? <p className="mt-1 text-xs text-red-600">{fieldErrors.budget}</p> : null}
           </label>
 
           <label className="text-sm font-medium text-slate-700">
@@ -90,9 +135,13 @@ function PostProjectPage() {
               name="deadline"
               type="date"
               value={form.deadline}
-              onChange={handleChange}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, deadline: null }));
+              }}
               required
             />
+            {fieldErrors.deadline ? <p className="mt-1 text-xs text-red-600">{fieldErrors.deadline}</p> : null}
           </label>
         </div>
 

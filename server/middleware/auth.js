@@ -1,10 +1,11 @@
 const { verifyToken } = require("../utils/jwt");
+const createHttpError = require("../utils/httpError");
 
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization || "";
 
   if (!authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return next(createHttpError(401, "Unauthorized"));
   }
 
   const token = authHeader.split(" ")[1];
@@ -14,7 +15,7 @@ function authMiddleware(req, res, next) {
     req.user = decoded;
     return next();
   } catch (_error) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+    return next(createHttpError(401, "Invalid or expired token"));
   }
 }
 

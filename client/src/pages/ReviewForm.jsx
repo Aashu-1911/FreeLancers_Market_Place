@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import api from "../lib/api.js";
 
 function renderRatingBar(rating) {
@@ -23,7 +24,9 @@ function ReviewForm({ contractId, reviewerUserId }) {
         setExistingReview(response.data);
       } catch (requestError) {
         if (requestError.response?.status !== 404) {
-          setError(requestError.response?.data?.message || "Failed to load review information");
+          const message = requestError.response?.data?.message || "Failed to load review information";
+          setError(message);
+          toast.error(message);
         }
       } finally {
         setIsLoading(false);
@@ -55,8 +58,11 @@ function ReviewForm({ contractId, reviewerUserId }) {
 
       setExistingReview(response.data);
       setSuccessMessage("Review submitted successfully.");
+      toast.success("Review submitted successfully.");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Failed to submit review");
+      const message = requestError.response?.data?.message || "Failed to submit review";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }

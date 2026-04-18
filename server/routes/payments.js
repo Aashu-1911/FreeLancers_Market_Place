@@ -1,6 +1,8 @@
 const express = require("express");
+const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
+const validateRequest = require("../middleware/validateRequest");
 
 const router = express.Router();
 
@@ -22,6 +24,19 @@ function parseDate(rawDate) {
   const parsed = new Date(rawDate);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
+
+const paymentStatusValues = ["pending", "completed"];
+
+const createPaymentValidation = [
+  body("contract_id").isInt({ min: 1 }).withMessage("contract_id must be a positive integer"),
+  body("amount").isFloat({ gt: 0 }).withMessage("amount must be a positive number"),
+  body("payment_status").optional().isIn(paymentStatusValues).withMessage("payment_status must be pending or completed"),
+  body("transaction_date").optional().isISO8601().withMessage("transaction_date must be a valid date"),
+];
+
+const updatePaymentValidation = [
+  body("payment_status").isIn(paymentStatusValues).withMessage("payment_status must be pending or completed"),
+];
 
 async function canAccessContract(contractId, user) {
   const contract = await prisma.contract.findUnique({
@@ -49,7 +64,7 @@ async function canAccessContract(contractId, user) {
   return { allowed: false, contract, reason: "Forbidden", status: 403 };
 }
 
-router.post("/", authMiddleware, async (req, res) => {
+router.post("/", authMiddleware, createPaymentValidation, validateRequest, async (req, res) => {
   try {
     if (req.user.role !== "client") {
       return res.status(403).json({ message: "Only clients can create payments" });
@@ -122,7 +137,7 @@ router.get("/contract/:contract_id", authMiddleware, async (req, res) => {
   }
 });
 
-router.put("/:id", authMiddleware, async (req, res) => {
+router.put("/:id", authMiddleware, updatePaymentValidation, validateRequest, async (req, res) => {
   try {
     if (req.user.role !== "client") {
       return res.status(403).json({ message: "Only clients can update payments" });

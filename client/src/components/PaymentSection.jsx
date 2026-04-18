@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import api from "../lib/api.js";
 
 function formatCurrency(value) {
@@ -60,11 +61,14 @@ function PaymentSection({ contractId, userRole, agreedAmount }) {
 
       await loadPayments();
       setSuccessMessage("Payment record created.");
+      toast.success("Payment record created.");
       setAmount(agreedAmount ? String(Number(agreedAmount)) : "");
       setPaymentStatus("pending");
       setTransactionDate("");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Failed to create payment");
+      const message = requestError.response?.data?.message || "Failed to create payment";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -82,8 +86,11 @@ function PaymentSection({ contractId, userRole, agreedAmount }) {
 
       await loadPayments();
       setSuccessMessage("Payment marked as completed.");
+      toast.success("Payment marked as completed.");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Failed to update payment");
+      const message = requestError.response?.data?.message || "Failed to update payment";
+      setError(message);
+      toast.error(message);
     } finally {
       setIsUpdatingById((prev) => ({ ...prev, [paymentId]: false }));
     }

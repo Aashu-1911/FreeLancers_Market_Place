@@ -1,6 +1,8 @@
 const express = require("express");
+const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
+const validateRequest = require("../middleware/validateRequest");
 
 const router = express.Router();
 
@@ -14,7 +16,14 @@ function parseRating(rawRating) {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
-router.post("/", authMiddleware, async (req, res) => {
+const createReviewValidation = [
+  body("contract_id").isInt({ min: 1 }).withMessage("contract_id must be a positive integer"),
+  body("user_id").isInt({ min: 1 }).withMessage("user_id must be a positive integer"),
+  body("rating").isInt({ min: 1, max: 5 }).withMessage("rating must be between 1 and 5"),
+  body("comment").optional({ nullable: true }).trim(),
+];
+
+router.post("/", authMiddleware, createReviewValidation, validateRequest, async (req, res) => {
   try {
     if (req.user.role !== "client") {
       return res.status(403).json({ message: "Only clients can submit reviews" });
