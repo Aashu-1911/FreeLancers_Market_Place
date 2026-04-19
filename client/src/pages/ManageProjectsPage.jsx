@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import CreateContractModal from "../components/CreateContractModal.jsx";
@@ -27,6 +27,11 @@ function ManageProjectsPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isApplicantsLoading, setIsApplicantsLoading] = useState(false);
+
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.project_id === selectedProjectId) || null,
+    [projects, selectedProjectId]
+  );
 
   const loadProjects = async () => {
     const profileResponse = await api.get(`/api/profile/client/${user.user_id}`);
@@ -122,17 +127,6 @@ function ManageProjectsPage() {
     }
   };
 
-  const loadApplicants = async (projectId) => {
-    setIsApplicantsLoading(true);
-
-    try {
-      const applicantsResponse = await api.get(`/api/applications/project/${projectId}`);
-      setApplicants(applicantsResponse.data);
-    } finally {
-      setIsApplicantsLoading(false);
-    }
-  };
-
   const handleOpenContractModal = (application) => {
     setSelectedApplicant(application);
     setIsContractModalOpen(true);
@@ -210,20 +204,53 @@ function ManageProjectsPage() {
 
   useEffect(() => {
     const fetchApplicants = async () => {
+      let isCurrent = true;
+
       if (!selectedProjectId) {
         setApplicants([]);
+        setIsApplicantsLoading(false);
         return;
       }
 
+      setApplicants([]);
+      setIsApplicantsLoading(true);
+
       try {
         setError("");
-        await loadApplicants(selectedProjectId);
+
+        const applicantsResponse = await api.get(`/api/applications/project/${selectedProjectId}`);
+
+        if (!isCurrent) {
+          return;
+        }
+
+        setApplicants(applicantsResponse.data);
       } catch (requestError) {
-        setError(requestError.response?.data?.message || "Failed to load applicants");
+        if (isCurrent) {
+          setError(requestError.response?.data?.message || "Failed to load applicants");
+        }
+      } finally {
+        if (isCurrent) {
+          setIsApplicantsLoading(false);
+        }
       }
+
+      return () => {
+        isCurrent = false;
+      };
     };
 
-    fetchApplicants();
+    let cleanup;
+
+    fetchApplicants().then((teardown) => {
+      cleanup = teardown;
+    });
+
+    return () => {
+      if (typeof cleanup === "function") {
+        cleanup();
+      }
+    };
   }, [selectedProjectId]);
 
   if (isLoading) {
@@ -256,6 +283,7 @@ function ManageProjectsPage() {
                   }`}
                 >
                   <p className="font-semibold text-slate-900">{project.title}</p>
+                  <p className="mt-1 text-sm font-medium text-slate-700">Project ID: #{project.project_id}</p>
                   <p className="mt-1 text-sm text-slate-600">Budget: {formatCurrency(project.budget)}</p>
                   <p className="mt-1 text-xs uppercase text-slate-500">
                     {project.project_status} • {project._count?.applications || 0} applicants
@@ -299,12 +327,22 @@ function ManageProjectsPage() {
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-900">Applicants</h3>
+          {selectedProject ? (
+            <p className="mt-2 text-sm text-slate-600">
+              Showing applicants for Project #{selectedProject.project_id}: {selectedProject.title}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">Select a project to view applicants for that project.</p>
+          )}
           {isApplicantsLoading ? <p className="mt-3 text-slate-600">Loading applicants...</p> : null}
 
           {!isApplicantsLoading ? (
             <ul className="mt-4 space-y-3">
               {applicants.map((application) => (
                 <li key={application.application_id} className="rounded-lg border border-slate-200 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                    Applied to Project #{application.project_id}
+                  </p>
                   <button
                     type="button"
                     onClick={() => handleOpenProfilePreview(application.freelancer)}

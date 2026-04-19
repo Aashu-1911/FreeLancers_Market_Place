@@ -4,7 +4,82 @@ import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const userFields = ["first_name", "last_name", "email", "phone", "city", "pincode"];
-const freelancerFields = ["college_name", "degree", "year_of_study", "portfolio", "resume", "status"];
+const freelancerFields = ["college_name", "degree", "year_of_study", "status"];
+
+function normalizePortfolioUrl(value) {
+  const trimmed = String(value || "").trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
+function toPublicFileUrl(value) {
+  const trimmed = String(value || "").trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const apiBaseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+  const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+
+  return `${apiBaseUrl}${normalizedPath}`;
+}
+
+function parseYearOfStudyInput(value) {
+  const normalizedValue = String(value ?? "").trim();
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const numericValue = Number(normalizedValue);
+
+  if (Number.isInteger(numericValue) && numericValue > 0) {
+    return numericValue;
+  }
+
+  const normalizedLabel = normalizedValue
+    .toLowerCase()
+    .replace(/[-_]/g, " ")
+    .replace(/\s+/g, " ");
+
+  const yearMap = {
+    "1": 1,
+    "1st": 1,
+    "1st year": 1,
+    "first": 1,
+    "first year": 1,
+    "2": 2,
+    "2nd": 2,
+    "2nd year": 2,
+    "second": 2,
+    "second year": 2,
+    "3": 3,
+    "3rd": 3,
+    "3rd year": 3,
+    "third": 3,
+    "third year": 3,
+    "4": 4,
+    "4th": 4,
+    "4th year": 4,
+    "fourth": 4,
+    "fourth year": 4,
+  };
+
+  return yearMap[normalizedLabel] || null;
+}
 
 function FreelancerProfilePage() {
   const { user } = useAuth();
@@ -14,9 +89,11 @@ function FreelancerProfilePage() {
   const [selectedSkillId, setSelectedSkillId] = useState("");
   const [skillQuery, setSkillQuery] = useState("");
   const [form, setForm] = useState({});
+  const [resumeFile, setResumeFile] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
 
   const assignedSkillIds = useMemo(
     () => new Set((profile?.skills || []).map((entry) => entry.skill_id)),
@@ -84,6 +161,9 @@ function FreelancerProfilePage() {
     event.preventDefault();
 
     const nextErrors = {};
+    const normalizedPortfolioUrl = normalizePortfolioUrl(form.portfolio);
+    const parsedYearOfStudy = parseYearOfStudyInput(form.year_of_study);
+
     if (!form.first_name?.trim()) {
       nextErrors.first_name = "First name is required.";
     }
@@ -93,6 +173,21 @@ function FreelancerProfilePage() {
     if (!/^\S+@\S+\.\S+$/.test(form.email || "")) {
       nextErrors.email = "Enter a valid email address.";
     }
+    if (String(form.year_of_study || "").trim() && parsedYearOfStudy === null) {
+      nextErrors.year_of_study = "Enter a valid year (for example: 2, 2nd year, second year).";
+    }
+    if (normalizedPortfolioUrl) {
+      try {
+        const parsedUrl = new URL(normalizedPortfolioUrl);
+
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+          nextErrors.portfolio = "Portfolio link must start with http:// or https://";
+        }
+      } catch (_error) {
+        nextErrors.portfolio = "Enter a valid portfolio link.";
+      }
+    }
+
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       return;
@@ -114,12 +209,17 @@ function FreelancerProfilePage() {
         payload[field] = form[field] || null;
       });
 
-      if (payload.year_of_study) {
-        payload.year_of_study = Number(payload.year_of_study);
-      }
+      payload.portfolio = normalizedPortfolioUrl || null;
+      payload.year_of_study = parsedYearOfStudy;
 
       const response = await api.put(`/api/profile/freelancer/${profile.freelancer_id}`, payload);
       setProfile(response.data);
+      setForm((prev) => ({
+        ...prev,
+        portfolio: response.data.portfolio || "",
+        year_of_study: response.data.year_of_study || "",
+        resume: response.data.resume || "",
+      }));
       toast.success("Profile updated successfully.");
     } catch (requestError) {
       const message = requestError.response?.data?.message || "Failed to update profile";
@@ -127,6 +227,42 @@ function FreelancerProfilePage() {
       toast.error(message);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleResumeFileChange = (event) => {
+    const selectedFile = event.target.files?.[0] || null;
+    setResumeFile(selectedFile);
+  };
+
+  const handleResumeUpload = async () => {
+    if (!profile?.freelancer_id || !resumeFile) {
+      return;
+    }
+
+    setIsUploadingResume(true);
+
+    try {
+      setError("");
+
+      const payload = new FormData();
+      payload.append("resume", resumeFile);
+
+      const response = await api.post(`/api/profile/freelancer/${profile.freelancer_id}/resume`, payload);
+
+      setProfile(response.data.freelancer || profile);
+      setForm((prev) => ({
+        ...prev,
+        resume: response.data.resume || prev.resume,
+      }));
+      setResumeFile(null);
+      toast.success("Resume uploaded successfully.");
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || "Failed to upload resume";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsUploadingResume(false);
     }
   };
 
@@ -235,6 +371,68 @@ function FreelancerProfilePage() {
               />
             </label>
           ))}
+
+          <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+            Portfolio Link
+            <input
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              name="portfolio"
+              type="url"
+              placeholder="https://your-portfolio.com"
+              value={form.portfolio || ""}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, portfolio: null }));
+              }}
+            />
+            {fieldErrors.portfolio ? <p className="mt-1 text-xs text-red-600">{fieldErrors.portfolio}</p> : null}
+            {form.portfolio ? (
+              <a
+                className="mt-2 inline-block text-xs font-medium text-blue-700 hover:underline"
+                href={normalizePortfolioUrl(form.portfolio)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open portfolio
+              </a>
+            ) : null}
+          </label>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+            <p className="text-sm font-semibold text-slate-800">Resume</p>
+            <p className="mt-1 text-xs text-slate-600">Upload PDF, DOC, or DOCX (max 5MB).</p>
+
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={handleResumeFileChange}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              />
+
+              <button
+                type="button"
+                onClick={handleResumeUpload}
+                disabled={!resumeFile || isUploadingResume}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isUploadingResume ? "Uploading..." : "Upload Resume"}
+              </button>
+            </div>
+
+            {form.resume ? (
+              <a
+                className="mt-3 inline-block text-sm font-medium text-blue-700 hover:underline"
+                href={toPublicFileUrl(form.resume)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                View current resume
+              </a>
+            ) : (
+              <p className="mt-3 text-sm text-slate-500">No resume uploaded yet.</p>
+            )}
+          </div>
 
           <label className="flex items-center gap-2 text-sm font-medium text-slate-700 sm:col-span-2">
             <input

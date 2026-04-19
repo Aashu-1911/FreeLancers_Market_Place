@@ -55,6 +55,70 @@ function parseId(rawId) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+async function findFreelancerByIdOrUserId(id, options = {}) {
+  const byUserId = await prisma.freelancer.findUnique({
+    where: { user_id: id },
+    ...options,
+  });
+
+  if (byUserId) {
+    return byUserId;
+  }
+
+  return prisma.freelancer.findUnique({
+    where: { freelancer_id: id },
+    ...options,
+  });
+}
+
+async function findFreelancerByFreelancerIdOrUserId(id, options = {}) {
+  const byFreelancerId = await prisma.freelancer.findUnique({
+    where: { freelancer_id: id },
+    ...options,
+  });
+
+  if (byFreelancerId) {
+    return byFreelancerId;
+  }
+
+  return prisma.freelancer.findUnique({
+    where: { user_id: id },
+    ...options,
+  });
+}
+
+async function findClientByIdOrUserId(id, options = {}) {
+  const byUserId = await prisma.client.findUnique({
+    where: { user_id: id },
+    ...options,
+  });
+
+  if (byUserId) {
+    return byUserId;
+  }
+
+  return prisma.client.findUnique({
+    where: { client_id: id },
+    ...options,
+  });
+}
+
+async function findClientByClientIdOrUserId(id, options = {}) {
+  const byClientId = await prisma.client.findUnique({
+    where: { client_id: id },
+    ...options,
+  });
+
+  if (byClientId) {
+    return byClientId;
+  }
+
+  return prisma.client.findUnique({
+    where: { user_id: id },
+    ...options,
+  });
+}
+
 function pickDefined(source, keys) {
   return keys.reduce((acc, key) => {
     if (Object.prototype.hasOwnProperty.call(source, key) && source[key] !== undefined) {
@@ -75,6 +139,49 @@ function isValidHttpUrl(value) {
 
 function getResumePublicPath(fileName) {
   return `/uploads/resumes/${fileName}`;
+}
+
+function parseYearOfStudy(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const numericValue = Number(value);
+
+  if (Number.isInteger(numericValue) && numericValue > 0) {
+    return numericValue;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[-_]/g, " ")
+    .replace(/\s+/g, " ");
+
+  const yearMap = {
+    "1": 1,
+    "1st": 1,
+    "1st year": 1,
+    "first": 1,
+    "first year": 1,
+    "2": 2,
+    "2nd": 2,
+    "2nd year": 2,
+    "second": 2,
+    "second year": 2,
+    "3": 3,
+    "3rd": 3,
+    "3rd year": 3,
+    "third": 3,
+    "third year": 3,
+    "4": 4,
+    "4th": 4,
+    "4th year": 4,
+    "fourth": 4,
+    "fourth year": 4,
+  };
+
+  return yearMap[normalized] || null;
 }
 
 function removePreviousResumeFile(resumePath) {
@@ -107,7 +214,10 @@ const commonProfileValidation = [
 
 const freelancerProfileValidation = [
   ...commonProfileValidation,
-  body("year_of_study").optional({ nullable: true }).isInt({ min: 1 }).withMessage("year_of_study must be a positive integer"),
+  body("year_of_study")
+    .optional({ nullable: true })
+    .custom((value) => value === "" || parseYearOfStudy(value) !== null)
+    .withMessage("year_of_study must be a positive integer or a valid year label"),
   body("availability").optional().isBoolean().withMessage("availability must be a boolean"),
   body("portfolio")
     .optional({ nullable: true })
@@ -125,10 +235,7 @@ router.get("/freelancer/:id", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Invalid freelancer id" });
     }
 
-    const freelancer = await prisma.freelancer.findFirst({
-      where: {
-        OR: [{ freelancer_id: id }, { user_id: id }],
-      },
+    const freelancer = await findFreelancerByIdOrUserId(id, {
       include: {
         user: {
           select: {
@@ -169,10 +276,7 @@ router.put("/freelancer/:id", authMiddleware, freelancerProfileValidation, valid
       return res.status(400).json({ message: "Invalid freelancer id" });
     }
 
-    const existingFreelancer = await prisma.freelancer.findFirst({
-      where: {
-        OR: [{ freelancer_id: id }, { user_id: id }],
-      },
+    const existingFreelancer = await findFreelancerByFreelancerIdOrUserId(id, {
       include: {
         user: true,
       },
@@ -192,13 +296,18 @@ router.put("/freelancer/:id", authMiddleware, freelancerProfileValidation, valid
       "degree",
       "year_of_study",
       "portfolio",
-      "resume",
       "availability",
       "status",
     ]);
 
-    if (Object.prototype.hasOwnProperty.call(freelancerPayload, "year_of_study") && freelancerPayload.year_of_study !== null) {
-      freelancerPayload.year_of_study = Number(freelancerPayload.year_of_study);
+    if (Object.prototype.hasOwnProperty.call(freelancerPayload, "year_of_study")) {
+      const parsedYearOfStudy = parseYearOfStudy(freelancerPayload.year_of_study);
+
+      if (freelancerPayload.year_of_study !== "" && freelancerPayload.year_of_study !== null && parsedYearOfStudy === null) {
+        return res.status(400).json({ message: "year_of_study must be a positive integer or a valid year label" });
+      }
+
+      freelancerPayload.year_of_study = parsedYearOfStudy;
     }
 
     await prisma.$transaction(async (tx) => {
@@ -286,11 +395,7 @@ router.post(
       return res.status(400).json({ message: "resume file is required" });
     }
 
-    const existingFreelancer = await prisma.freelancer.findFirst({
-      where: {
-        OR: [{ freelancer_id: id }, { user_id: id }],
-      },
-    });
+    const existingFreelancer = await findFreelancerByFreelancerIdOrUserId(id);
 
     if (!existingFreelancer) {
       return res.status(404).json({ message: "Freelancer not found" });
@@ -352,10 +457,7 @@ router.get("/client/:id", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "Invalid client id" });
     }
 
-    const client = await prisma.client.findFirst({
-      where: {
-        OR: [{ client_id: id }, { user_id: id }],
-      },
+    const client = await findClientByIdOrUserId(id, {
       include: {
         user: {
           select: {
@@ -391,10 +493,7 @@ router.put("/client/:id", authMiddleware, clientProfileValidation, validateReque
       return res.status(400).json({ message: "Invalid client id" });
     }
 
-    const existingClient = await prisma.client.findFirst({
-      where: {
-        OR: [{ client_id: id }, { user_id: id }],
-      },
+    const existingClient = await findClientByClientIdOrUserId(id, {
       include: {
         user: true,
       },

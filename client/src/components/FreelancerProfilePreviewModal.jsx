@@ -7,6 +7,11 @@ function normalizeUrl(value) {
     return "";
   }
 
+  if (trimmed.startsWith("/")) {
+    const apiBaseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+    return `${apiBaseUrl}${trimmed}`;
+  }
+
   if (/^https?:\/\//i.test(trimmed)) {
     return trimmed;
   }
