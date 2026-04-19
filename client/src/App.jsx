@@ -18,8 +18,13 @@ import ClientDashboard from "./pages/ClientDashboard.jsx";
 import PrivateRoute from "./components/PrivateRoute.jsx";
 import Navbar from "./components/Navbar.jsx";
 import LoadingSpinner from "./components/LoadingSpinner.jsx";
+import { useAuth } from "./context/AuthContext.jsx";
 
 function App() {
+  const { isAuthenticated, user } = useAuth();
+
+  const authenticatedHomePath = user?.role === "client" ? "/dashboard/client" : "/dashboard/freelancer";
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <Navbar />
@@ -27,8 +32,8 @@ function App() {
 
       <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:py-10">
         <Routes>
-          <Route path="/" element={<Navigate to="/home" replace />} />
-          <Route path="/home" element={<HomePage />} />
+          <Route path="/" element={<Navigate to={isAuthenticated ? authenticatedHomePath : "/home"} replace />} />
+          <Route path="/home" element={isAuthenticated ? <Navigate to={authenticatedHomePath} replace /> : <HomePage />} />
           <Route path="/projects" element={<ProjectListPage />} />
           <Route path="/projects/:id" element={<ProjectDetailPage />} />
           <Route path="/register" element={<RegisterPage />} />

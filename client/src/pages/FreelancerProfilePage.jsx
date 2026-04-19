@@ -12,6 +12,7 @@ function FreelancerProfilePage() {
   const [profile, setProfile] = useState(null);
   const [skills, setSkills] = useState([]);
   const [selectedSkillId, setSelectedSkillId] = useState("");
+  const [skillQuery, setSkillQuery] = useState("");
   const [form, setForm] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
@@ -20,6 +21,11 @@ function FreelancerProfilePage() {
   const assignedSkillIds = useMemo(
     () => new Set((profile?.skills || []).map((entry) => entry.skill_id)),
     [profile]
+  );
+
+  const availableSkills = useMemo(
+    () => skills.filter((skill) => !assignedSkillIds.has(skill.skill_id)),
+    [skills, assignedSkillIds]
   );
 
   const loadData = async () => {
@@ -125,7 +131,19 @@ function FreelancerProfilePage() {
   };
 
   const handleAssignSkill = async () => {
-    if (!selectedSkillId || !profile?.freelancer_id) {
+    if (!profile?.freelancer_id) {
+      return;
+    }
+
+    const matchedSkill = availableSkills.find(
+      (skill) => skill.skill_name.toLowerCase() === skillQuery.trim().toLowerCase()
+    );
+    const resolvedSkillId = selectedSkillId || matchedSkill?.skill_id;
+
+    if (!resolvedSkillId) {
+      const message = "Please choose a skill from suggestions.";
+      setError(message);
+      toast.error(message);
       return;
     }
 
@@ -133,9 +151,10 @@ function FreelancerProfilePage() {
       setError("");
       await api.post("/api/skills/assign", {
         freelancer_id: profile.freelancer_id,
-        skill_id: Number(selectedSkillId),
+        skill_id: Number(resolvedSkillId),
       });
       setSelectedSkillId("");
+      setSkillQuery("");
       await loadData();
       toast.success("Skill assigned successfully.");
     } catch (requestError) {
@@ -143,6 +162,17 @@ function FreelancerProfilePage() {
       setError(message);
       toast.error(message);
     }
+  };
+
+  const handleSkillQueryChange = (event) => {
+    const nextQuery = event.target.value;
+    setSkillQuery(nextQuery);
+
+    const matchedSkill = availableSkills.find(
+      (skill) => skill.skill_name.toLowerCase() === nextQuery.trim().toLowerCase()
+    );
+
+    setSelectedSkillId(matchedSkill ? String(matchedSkill.skill_id) : "");
   };
 
   const handleRemoveSkill = async (skillId) => {
@@ -232,24 +262,24 @@ function FreelancerProfilePage() {
         <h3 className="text-xl font-semibold text-slate-900">Skills</h3>
 
         <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-          <select
+          <input
+            list="skill-suggestions"
             className="w-full rounded-md border border-slate-300 px-3 py-2"
-            value={selectedSkillId}
-            onChange={(event) => setSelectedSkillId(event.target.value)}
-          >
-            <option value="">Select a skill</option>
-            {skills
-              .filter((skill) => !assignedSkillIds.has(skill.skill_id))
-              .map((skill) => (
-                <option key={skill.skill_id} value={skill.skill_id}>
-                  {skill.skill_name}
-                </option>
-              ))}
-          </select>
+            value={skillQuery}
+            onChange={handleSkillQueryChange}
+            placeholder="Type a skill to see suggestions"
+          />
+
+          <datalist id="skill-suggestions">
+            {availableSkills.map((skill) => (
+              <option key={skill.skill_id} value={skill.skill_name} />
+            ))}
+          </datalist>
 
           <button
             type="button"
-            className="rounded-md bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700"
+            disabled={!selectedSkillId}
+            className="rounded-md bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
             onClick={handleAssignSkill}
           >
             Add Skill

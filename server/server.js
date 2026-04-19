@@ -1,7 +1,9 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const fs = require("fs");
 const helmet = require("helmet");
+const path = require("path");
 const rateLimit = require("express-rate-limit");
 const prisma = require("./lib/prisma");
 const authRoutes = require("./routes/auth");
@@ -20,6 +22,11 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:5173";
+const uploadsDir = path.join(__dirname, "uploads");
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -48,6 +55,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use("/uploads", express.static(uploadsDir));
 app.use("/api", apiLimiter);
 
 app.use((req, res, next) => {
