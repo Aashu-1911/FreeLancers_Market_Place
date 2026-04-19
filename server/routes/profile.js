@@ -10,14 +10,20 @@ const validateRequest = require("../middleware/validateRequest");
 const router = express.Router();
 const uploadsRootDir = path.join(__dirname, "..", "uploads");
 const resumesDir = path.join(uploadsRootDir, "resumes");
+const profilePicturesDir = path.join(uploadsRootDir, "profile-pictures");
 const allowedResumeMimeTypes = new Set([
   "application/pdf",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
+const allowedProfilePictureMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 if (!fs.existsSync(resumesDir)) {
   fs.mkdirSync(resumesDir, { recursive: true });
+}
+
+if (!fs.existsSync(profilePicturesDir)) {
+  fs.mkdirSync(profilePicturesDir, { recursive: true });
 }
 
 const resumeStorage = multer.diskStorage({
@@ -43,6 +49,36 @@ const uploadResume = multer({
   fileFilter: (_req, file, callback) => {
     if (!allowedResumeMimeTypes.has(file.mimetype)) {
       callback(new Error("Only PDF, DOC, and DOCX files are allowed"));
+      return;
+    }
+
+    callback(null, true);
+  },
+});
+
+const profilePictureStorage = multer.diskStorage({
+  destination: (_req, _file, callback) => {
+    callback(null, profilePicturesDir);
+  },
+  filename: (_req, file, callback) => {
+    const safeBaseName = path
+      .parse(file.originalname || "profile-picture")
+      .name.replace(/[^a-zA-Z0-9-_]/g, "_")
+      .slice(0, 60);
+    const extension = path.extname(file.originalname || "").toLowerCase();
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    callback(null, `${safeBaseName || "profile-picture"}-${uniqueSuffix}${extension}`);
+  },
+});
+
+const uploadProfilePicture = multer({
+  storage: profilePictureStorage,
+  limits: {
+    fileSize: 3 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, callback) => {
+    if (!allowedProfilePictureMimeTypes.has(file.mimetype)) {
+      callback(new Error("Only JPG, PNG, WEBP, and GIF files are allowed"));
       return;
     }
 
@@ -141,6 +177,10 @@ function getResumePublicPath(fileName) {
   return `/uploads/resumes/${fileName}`;
 }
 
+function getProfilePicturePublicPath(fileName) {
+  return `/uploads/profile-pictures/${fileName}`;
+}
+
 function parseYearOfStudy(value) {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -203,6 +243,25 @@ function removePreviousResumeFile(resumePath) {
   }
 }
 
+function removePreviousProfilePictureFile(profilePicturePath) {
+  if (!profilePicturePath || typeof profilePicturePath !== "string") {
+    return;
+  }
+
+  const normalizedPath = profilePicturePath.replace(/\\/g, "/");
+
+  if (!normalizedPath.startsWith("/uploads/profile-pictures/")) {
+    return;
+  }
+
+  const relativeFilePath = normalizedPath.replace(/^\/uploads\//, "");
+  const absoluteFilePath = path.join(uploadsRootDir, relativeFilePath);
+
+  if (fs.existsSync(absoluteFilePath)) {
+    fs.unlinkSync(absoluteFilePath);
+  }
+}
+
 const commonProfileValidation = [
   body("first_name").optional().trim().notEmpty().withMessage("first_name cannot be empty"),
   body("last_name").optional().trim().notEmpty().withMessage("last_name cannot be empty"),
@@ -227,6 +286,72 @@ const freelancerProfileValidation = [
 
 const clientProfileValidation = [...commonProfileValidation];
 
+router.post(
+  "/photo",
+  authMiddleware,
+  (req, res, next) => {
+    uploadProfilePicture.single("profile_picture")(req, res, (error) => {
+      if (!error) {
+        next();
+        return;
+      }
+
+      if (error.code === "LIMIT_FILE_SIZE") {
+        res.status(400).json({ message: "Profile picture must be 3MB or smaller" });
+        return;
+      }
+
+      if (error.message && error.message.includes("Only JPG, PNG, WEBP, and GIF files are allowed")) {
+        res.status(400).json({ message: error.message });
+        return;
+      }
+
+      res.status(500).json({ message: "Failed to upload profile picture", error: error.message });
+    });
+  },
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: "profile_picture file is required" });
+      }
+
+      const existingUser = await prisma.user.findUnique({
+        where: { user_id: req.user.user_id },
+      });
+
+      if (!existingUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const profilePicturePath = getProfilePicturePublicPath(req.file.filename);
+
+      const updatedUser = await prisma.user.update({
+        where: { user_id: req.user.user_id },
+        data: {
+          profile_picture: profilePicturePath,
+        },
+        select: {
+          user_id: true,
+          first_name: true,
+          last_name: true,
+          username: true,
+          email: true,
+          profile_picture: true,
+        },
+      });
+
+      removePreviousProfilePictureFile(existingUser.profile_picture);
+
+      return res.status(200).json({
+        message: "Profile picture uploaded successfully",
+        user: updatedUser,
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to upload profile picture", error: error.message });
+    }
+  }
+);
+
 router.get("/freelancer/:id", authMiddleware, async (req, res) => {
   try {
     const id = parseId(req.params.id);
@@ -244,6 +369,7 @@ router.get("/freelancer/:id", authMiddleware, async (req, res) => {
             last_name: true,
             username: true,
             email: true,
+            profile_picture: true,
             phone: true,
             city: true,
             pincode: true,
@@ -336,6 +462,7 @@ router.put("/freelancer/:id", authMiddleware, freelancerProfileValidation, valid
             last_name: true,
             username: true,
             email: true,
+            profile_picture: true,
             phone: true,
             city: true,
             pincode: true,
@@ -422,6 +549,7 @@ router.post(
             last_name: true,
             username: true,
             email: true,
+            profile_picture: true,
             phone: true,
             city: true,
             pincode: true,
@@ -466,6 +594,7 @@ router.get("/client/:id", authMiddleware, async (req, res) => {
             last_name: true,
             username: true,
             email: true,
+            profile_picture: true,
             phone: true,
             city: true,
             pincode: true,
@@ -536,6 +665,7 @@ router.put("/client/:id", authMiddleware, clientProfileValidation, validateReque
             last_name: true,
             username: true,
             email: true,
+            profile_picture: true,
             phone: true,
             city: true,
             pincode: true,

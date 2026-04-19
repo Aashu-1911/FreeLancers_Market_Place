@@ -55,7 +55,15 @@ app.use(
   })
 );
 app.use(express.json());
-app.use("/uploads", express.static(uploadsDir));
+app.use(
+  "/uploads",
+  express.static(uploadsDir, {
+    setHeaders(res) {
+      // Uploaded files are consumed by the frontend running on a different origin in dev.
+      res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    },
+  })
+);
 app.use("/api", apiLimiter);
 
 app.use((req, res, next) => {

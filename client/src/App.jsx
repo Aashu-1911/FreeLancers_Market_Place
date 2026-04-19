@@ -34,8 +34,14 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate to={isAuthenticated ? authenticatedHomePath : "/home"} replace />} />
           <Route path="/home" element={isAuthenticated ? <Navigate to={authenticatedHomePath} replace /> : <HomePage />} />
-          <Route path="/projects" element={<ProjectListPage />} />
-          <Route path="/projects/:id" element={<ProjectDetailPage />} />
+          <Route
+            path="/projects"
+            element={isAuthenticated && user?.role === "client" ? <Navigate to="/dashboard/client" replace /> : <ProjectListPage />}
+          />
+          <Route
+            path="/projects/:id"
+            element={isAuthenticated && user?.role === "client" ? <Navigate to="/dashboard/client" replace /> : <ProjectDetailPage />}
+          />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
 

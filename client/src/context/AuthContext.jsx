@@ -23,6 +23,8 @@ function decodeToken(token) {
       role: payload.role,
       username: payload.username || null,
       exp: payload.exp,
+      profile_picture: null,
+      profile_picture_version: null,
       first_name: null,
       last_name: null,
       email: null,
@@ -42,6 +44,8 @@ function mergeTokenAndUser(token, userData) {
   return {
     ...tokenData,
     username: userData?.username || tokenData.username,
+    profile_picture: userData?.profile_picture || tokenData.profile_picture,
+    profile_picture_version: userData?.profile_picture_version || tokenData.profile_picture_version,
     first_name: userData?.first_name || tokenData.first_name,
     last_name: userData?.last_name || tokenData.last_name,
     email: userData?.email || tokenData.email,
@@ -73,6 +77,22 @@ export function AuthProvider({ children }) {
     setUser(mergeTokenAndUser(newToken, userData));
   };
 
+  const updateUser = (partialUser = {}) => {
+    setUser((prevUser) => {
+      if (!prevUser) {
+        return prevUser;
+      }
+
+      const nextUser = {
+        ...prevUser,
+        ...partialUser,
+      };
+
+      localStorage.setItem("auth_user", JSON.stringify(nextUser));
+      return nextUser;
+    });
+  };
+
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("auth_user");
@@ -86,6 +106,7 @@ export function AuthProvider({ children }) {
       user,
       isAuthenticated: Boolean(token && user),
       login,
+      updateUser,
       logout,
     }),
     [token, user]
