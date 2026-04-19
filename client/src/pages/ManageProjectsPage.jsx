@@ -203,9 +203,9 @@ function ManageProjectsPage() {
   }, [user?.user_id]);
 
   useEffect(() => {
-    const fetchApplicants = async () => {
-      let isCurrent = true;
+    let isCurrent = true;
 
+    const fetchApplicants = async () => {
       if (!selectedProjectId) {
         setApplicants([]);
         setIsApplicantsLoading(false);
@@ -234,22 +234,12 @@ function ManageProjectsPage() {
           setIsApplicantsLoading(false);
         }
       }
-
-      return () => {
-        isCurrent = false;
-      };
     };
 
-    let cleanup;
-
-    fetchApplicants().then((teardown) => {
-      cleanup = teardown;
-    });
+    fetchApplicants();
 
     return () => {
-      if (typeof cleanup === "function") {
-        cleanup();
-      }
+      isCurrent = false;
     };
   }, [selectedProjectId]);
 
