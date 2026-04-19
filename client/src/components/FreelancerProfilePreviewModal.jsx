@@ -30,6 +30,7 @@ function FreelancerProfilePreviewModal({ isOpen, freelancer, onClose }) {
   }
 
   const initials = `${freelancer.user.first_name?.[0] || ""}${freelancer.user.last_name?.[0] || ""}`.toUpperCase() || "F";
+  const profilePictureUrl = normalizeUrl(freelancer.user.profile_picture);
   const portfolioUrl = normalizeUrl(freelancer.portfolio);
   const resumeUrl = normalizeUrl(freelancer.resume);
 
@@ -38,9 +39,17 @@ function FreelancerProfilePreviewModal({ isOpen, freelancer, onClose }) {
       <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
-              {initials}
-            </div>
+            {profilePictureUrl ? (
+              <img
+                src={profilePictureUrl}
+                alt="Freelancer"
+                className="h-12 w-12 rounded-full border border-slate-200 object-cover"
+              />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
+                {initials}
+              </div>
+            )}
             <div>
               <h3 className="text-xl font-semibold text-slate-900">
                 {freelancer.user.first_name} {freelancer.user.last_name}

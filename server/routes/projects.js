@@ -34,6 +34,51 @@ function parseTechStack(rawTechStack) {
   return [...new Set(rawTechStack.map((item) => String(item || "").trim()).filter(Boolean))];
 }
 
+function parseWorkMode(rawWorkMode) {
+  if (rawWorkMode === undefined || rawWorkMode === null) {
+    return null;
+  }
+
+  const normalizedValue = String(rawWorkMode).trim().toLowerCase();
+
+  if (normalizedValue === "remote") {
+    return "remote";
+  }
+
+  if (normalizedValue === "offline" || normalizedValue === "office") {
+    return "offline";
+  }
+
+  return null;
+}
+
+function parseEngagementType(rawEngagementType) {
+  if (rawEngagementType === undefined || rawEngagementType === null) {
+    return null;
+  }
+
+  const normalizedValue = String(rawEngagementType).trim().toLowerCase();
+
+  if (normalizedValue === "full_time" || normalizedValue === "fulltime") {
+    return "full_time";
+  }
+
+  if (normalizedValue === "part_time" || normalizedValue === "parttime") {
+    return "part_time";
+  }
+
+  return null;
+}
+
+function normalizeText(rawValue) {
+  if (rawValue === undefined || rawValue === null) {
+    return null;
+  }
+
+  const trimmedValue = String(rawValue).trim();
+  return trimmedValue ? trimmedValue : null;
+}
+
 function parseSkillIds(rawSkillIds) {
   if (rawSkillIds === undefined) {
     return undefined;
@@ -170,6 +215,16 @@ const createProjectValidation = [
   body("description").trim().notEmpty().withMessage("description is required"),
   body("budget").isFloat({ gt: 0 }).withMessage("budget must be a positive number"),
   body("deadline").isISO8601().withMessage("deadline must be a valid date"),
+  body("work_mode")
+    .trim()
+    .isIn(["remote", "offline", "office"])
+    .withMessage("work_mode must be remote or offline"),
+  body("engagement_type")
+    .trim()
+    .isIn(["full_time", "part_time", "fulltime", "parttime"])
+    .withMessage("engagement_type must be full_time or part_time"),
+  body("address").optional({ nullable: true }).trim(),
+  body("area").optional({ nullable: true }).trim(),
   body("tech_stack").optional().isArray().withMessage("tech_stack must be an array"),
   body("tech_stack.*").optional().isString().withMessage("tech_stack must contain only strings"),
   body("required_skill_ids").optional().isArray().withMessage("required_skill_ids must be an array"),
@@ -185,6 +240,18 @@ const updateProjectValidation = [
   body("description").optional().trim().notEmpty().withMessage("description cannot be empty"),
   body("budget").optional().isFloat({ gt: 0 }).withMessage("budget must be a positive number"),
   body("deadline").optional().isISO8601().withMessage("deadline must be a valid date"),
+  body("work_mode")
+    .optional()
+    .trim()
+    .isIn(["remote", "offline", "office"])
+    .withMessage("work_mode must be remote or offline"),
+  body("engagement_type")
+    .optional()
+    .trim()
+    .isIn(["full_time", "part_time", "fulltime", "parttime"])
+    .withMessage("engagement_type must be full_time or part_time"),
+  body("address").optional({ nullable: true }).trim(),
+  body("area").optional({ nullable: true }).trim(),
   body("tech_stack").optional().isArray().withMessage("tech_stack must be an array"),
   body("tech_stack.*").optional().isString().withMessage("tech_stack must contain only strings"),
   body("required_skill_ids").optional().isArray().withMessage("required_skill_ids must be an array"),
@@ -201,14 +268,32 @@ router.post("/", authMiddleware, createProjectValidation, validateRequest, async
       return res.status(403).json({ message: "Only clients can post projects" });
     }
 
-    const { title, description, budget, deadline, tech_stack, required_skill_ids, project_status } = req.body;
+    const {
+      title,
+      description,
+      budget,
+      deadline,
+      work_mode,
+      engagement_type,
+      address,
+      area,
+      tech_stack,
+      required_skill_ids,
+      project_status,
+    } = req.body;
 
-    if (!title || !description || !budget || !deadline) {
-      return res.status(400).json({ message: "title, description, budget, and deadline are required" });
+    if (!title || !description || !budget || !deadline || !work_mode || !engagement_type) {
+      return res.status(400).json({
+        message: "title, description, budget, deadline, work_mode, and engagement_type are required",
+      });
     }
 
     const parsedBudget = parseBudget(budget);
     const parsedDeadline = parseDeadline(deadline);
+    const parsedWorkMode = parseWorkMode(work_mode);
+    const parsedEngagementType = parseEngagementType(engagement_type);
+    const normalizedAddress = normalizeText(address);
+    const normalizedArea = normalizeText(area);
     const parsedTechStack = parseTechStack(tech_stack ?? []);
     const parsedRequiredSkillIds = parseSkillIds(required_skill_ids ?? []);
 
@@ -218,6 +303,22 @@ router.post("/", authMiddleware, createProjectValidation, validateRequest, async
 
     if (!parsedDeadline) {
       return res.status(400).json({ message: "Invalid deadline" });
+    }
+
+    if (!parsedWorkMode) {
+      return res.status(400).json({ message: "Invalid work_mode" });
+    }
+
+    if (!parsedEngagementType) {
+      return res.status(400).json({ message: "Invalid engagement_type" });
+    }
+
+    if (!normalizedArea) {
+      return res.status(400).json({ message: "area is required" });
+    }
+
+    if (parsedWorkMode === "offline" && !normalizedAddress) {
+      return res.status(400).json({ message: "address is required for offline projects" });
     }
 
     if (!parsedTechStack) {
@@ -250,6 +351,10 @@ router.post("/", authMiddleware, createProjectValidation, validateRequest, async
         title,
         description,
         budget: parsedBudget,
+        work_mode: parsedWorkMode,
+        engagement_type: parsedEngagementType,
+        address: normalizedAddress,
+        area: normalizedArea,
         tech_stack: parsedTechStack,
         deadline: parsedDeadline,
         project_status: project_status || "open",
@@ -273,10 +378,45 @@ router.post("/", authMiddleware, createProjectValidation, validateRequest, async
 
 router.get("/", async (req, res) => {
   try {
+    const where = {
+      project_status: "open",
+    };
+
+    if (req.query.work_mode !== undefined) {
+      const parsedWorkMode = parseWorkMode(req.query.work_mode);
+
+      if (!parsedWorkMode) {
+        return res.status(400).json({ message: "Invalid work_mode filter" });
+      }
+
+      where.work_mode = parsedWorkMode;
+    }
+
+    if (req.query.engagement_type !== undefined) {
+      const parsedEngagementType = parseEngagementType(req.query.engagement_type);
+
+      if (!parsedEngagementType) {
+        return res.status(400).json({ message: "Invalid engagement_type filter" });
+      }
+
+      where.engagement_type = parsedEngagementType;
+    }
+
+    if (req.query.area !== undefined) {
+      const normalizedArea = normalizeText(req.query.area);
+
+      if (!normalizedArea) {
+        return res.status(400).json({ message: "Invalid area filter" });
+      }
+
+      where.area = {
+        contains: normalizedArea,
+        mode: "insensitive",
+      };
+    }
+
     const projects = await prisma.project.findMany({
-      where: {
-        project_status: "open",
-      },
+      where,
       include: projectInclude,
       orderBy: {
         posted_date: "desc",
@@ -435,7 +575,18 @@ router.put("/:id", authMiddleware, updateProjectValidation, validateRequest, asy
       return res.status(403).json({ message: "You can update only your own projects" });
     }
 
-    const payload = pickDefined(req.body, ["title", "description", "budget", "deadline", "project_status", "tech_stack"]);
+    const payload = pickDefined(req.body, [
+      "title",
+      "description",
+      "budget",
+      "deadline",
+      "work_mode",
+      "engagement_type",
+      "address",
+      "area",
+      "project_status",
+      "tech_stack",
+    ]);
     const hasRequiredSkillIds = Object.prototype.hasOwnProperty.call(req.body, "required_skill_ids");
     const parsedRequiredSkillIds = parseSkillIds(req.body.required_skill_ids);
 
@@ -459,6 +610,34 @@ router.put("/:id", authMiddleware, updateProjectValidation, validateRequest, asy
       payload.deadline = parsedDeadline;
     }
 
+    if (Object.prototype.hasOwnProperty.call(payload, "work_mode")) {
+      const parsedWorkMode = parseWorkMode(payload.work_mode);
+
+      if (!parsedWorkMode) {
+        return res.status(400).json({ message: "Invalid work_mode" });
+      }
+
+      payload.work_mode = parsedWorkMode;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "engagement_type")) {
+      const parsedEngagementType = parseEngagementType(payload.engagement_type);
+
+      if (!parsedEngagementType) {
+        return res.status(400).json({ message: "Invalid engagement_type" });
+      }
+
+      payload.engagement_type = parsedEngagementType;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "address")) {
+      payload.address = normalizeText(payload.address);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(payload, "area")) {
+      payload.area = normalizeText(payload.area);
+    }
+
     if (Object.prototype.hasOwnProperty.call(payload, "tech_stack")) {
       const parsedTechStack = parseTechStack(payload.tech_stack);
 
@@ -471,6 +650,20 @@ router.put("/:id", authMiddleware, updateProjectValidation, validateRequest, asy
 
     if (hasRequiredSkillIds && !parsedRequiredSkillIds) {
       return res.status(400).json({ message: "Invalid required_skill_ids" });
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(payload, "work_mode") ||
+      Object.prototype.hasOwnProperty.call(payload, "address")
+    ) {
+      const nextWorkMode = payload.work_mode || existingProject.work_mode;
+      const nextAddress = Object.prototype.hasOwnProperty.call(payload, "address")
+        ? payload.address
+        : existingProject.address;
+
+      if (nextWorkMode === "offline" && !normalizeText(nextAddress)) {
+        return res.status(400).json({ message: "address is required for offline projects" });
+      }
     }
 
     if (hasRequiredSkillIds) {

@@ -73,6 +73,10 @@ model Project {
   title           String
   description     String
   budget          Decimal       @db.Decimal(12, 2)
+  work_mode       String        @default("remote")
+  engagement_type String        @default("full_time")
+  address         String?
+  area            String?
   tech_stack      String[]      @default([])
   deadline        DateTime
   posted_date     DateTime      @default(now())

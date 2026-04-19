@@ -9,6 +9,31 @@ function formatCurrency(value) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(amount);
 }
 
+function getWorkModeLabel(value) {
+  return value === "offline" ? "Office / Offline" : "Remote";
+}
+
+function getEngagementTypeLabel(value) {
+  return value === "part_time" ? "Part Time" : "Full Time";
+}
+
+function toPublicFileUrl(value) {
+  const trimmed = String(value || "").trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const apiBaseUrl = (import.meta.env.VITE_API_URL || "http://localhost:5000").replace(/\/$/, "");
+  const normalizedPath = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+
+  return `${apiBaseUrl}${normalizedPath}`;
+}
+
 function ManageProjectsPage() {
   const { user } = useAuth();
   const [clientId, setClientId] = useState(null);
@@ -275,6 +300,10 @@ function ManageProjectsPage() {
                   <p className="font-semibold text-slate-900">{project.title}</p>
                   <p className="mt-1 text-sm font-medium text-slate-700">Project ID: #{project.project_id}</p>
                   <p className="mt-1 text-sm text-slate-600">Budget: {formatCurrency(project.budget)}</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {getWorkModeLabel(project.work_mode)} • {getEngagementTypeLabel(project.engagement_type)}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">Area: {project.area || "Not specified"}</p>
                   <p className="mt-1 text-xs uppercase text-slate-500">
                     {project.project_status} • {project._count?.applications || 0} applicants
                   </p>
@@ -333,16 +362,29 @@ function ManageProjectsPage() {
                   <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                     Applied to Project #{application.project_id}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenProfilePreview(application.freelancer)}
-                    className="text-left"
-                  >
-                    <p className="text-base font-semibold text-slate-900 hover:text-blue-700 hover:underline">
-                      {application.freelancer.user.first_name} {application.freelancer.user.last_name}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">@{application.freelancer.user.username || "user"}</p>
-                  </button>
+                  <div className="mt-2 flex items-center gap-3">
+                    {toPublicFileUrl(application.freelancer.user.profile_picture) ? (
+                      <img
+                        src={toPublicFileUrl(application.freelancer.user.profile_picture)}
+                        alt="Freelancer"
+                        className="h-10 w-10 rounded-full border border-slate-200 object-cover"
+                      />
+                    ) : (
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+                        {`${application.freelancer.user.first_name?.[0] || ""}${application.freelancer.user.last_name?.[0] || ""}`.toUpperCase() || "F"}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenProfilePreview(application.freelancer)}
+                      className="text-left"
+                    >
+                      <p className="text-base font-semibold text-slate-900 hover:text-blue-700 hover:underline">
+                        {application.freelancer.user.first_name} {application.freelancer.user.last_name}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">@{application.freelancer.user.username || "user"}</p>
+                    </button>
+                  </div>
                   <p className="mt-2 text-xs text-slate-500">
                     Click on the name to view full freelancer profile (skills, contact, portfolio, resume), then hire.
                   </p>

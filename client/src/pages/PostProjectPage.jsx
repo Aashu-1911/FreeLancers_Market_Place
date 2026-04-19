@@ -8,6 +8,10 @@ const initialState = {
   description: "",
   budget: "",
   deadline: "",
+  work_mode: "remote",
+  engagement_type: "full_time",
+  area: "",
+  address: "",
   tech_stack: [],
   required_skill_ids: [],
   project_status: "open",
@@ -58,6 +62,14 @@ function PostProjectPage() {
 
     if (!form.deadline) {
       nextErrors.deadline = "Deadline is required.";
+    }
+
+    if (!form.area?.trim()) {
+      nextErrors.area = "Area is required.";
+    }
+
+    if (form.work_mode === "offline" && !form.address?.trim()) {
+      nextErrors.address = "Address is required for offline projects.";
     }
 
     setFieldErrors(nextErrors);
@@ -275,6 +287,63 @@ function PostProjectPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-medium text-slate-700">
+            Work Mode
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              name="work_mode"
+              value={form.work_mode}
+              onChange={handleChange}
+            >
+              <option value="remote">Remote</option>
+              <option value="offline">Office / Offline</option>
+            </select>
+          </label>
+
+          <label className="text-sm font-medium text-slate-700">
+            Engagement Type
+            <select
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              name="engagement_type"
+              value={form.engagement_type}
+              onChange={handleChange}
+            >
+              <option value="full_time">Full Time</option>
+              <option value="part_time">Part Time</option>
+            </select>
+          </label>
+
+          <label className="text-sm font-medium text-slate-700">
+            Area
+            <input
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              name="area"
+              value={form.area}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, area: null }));
+              }}
+              placeholder="e.g. Andheri West"
+              required
+            />
+            {fieldErrors.area ? <p className="mt-1 text-xs text-red-600">{fieldErrors.area}</p> : null}
+          </label>
+
+          <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+            Address
+            <input
+              className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+              name="address"
+              value={form.address}
+              onChange={(event) => {
+                handleChange(event);
+                setFieldErrors((prev) => ({ ...prev, address: null }));
+              }}
+              placeholder="e.g. 301 Business Park, MG Road"
+            />
+            {fieldErrors.address ? <p className="mt-1 text-xs text-red-600">{fieldErrors.address}</p> : null}
+          </label>
+
           <label className="text-sm font-medium text-slate-700">
             Budget
             <input

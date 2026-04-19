@@ -8,6 +8,14 @@ function formatCurrency(value) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(amount);
 }
 
+function getWorkModeLabel(value) {
+  return value === "offline" ? "Office / Offline" : "Remote";
+}
+
+function getEngagementTypeLabel(value) {
+  return value === "part_time" ? "Part Time" : "Full Time";
+}
+
 function ProjectDetailPage() {
   const { id } = useParams();
   const { isAuthenticated, user } = useAuth();
@@ -98,9 +106,16 @@ function ProjectDetailPage() {
       <div className="mt-6 grid gap-3 text-sm text-slate-700 sm:grid-cols-2">
         <p>Budget: {formatCurrency(project.budget)}</p>
         <p>Deadline: {new Date(project.deadline).toLocaleDateString()}</p>
+        <p>Work Mode: {getWorkModeLabel(project.work_mode)}</p>
+        <p>Engagement: {getEngagementTypeLabel(project.engagement_type)}</p>
+        <p>Area: {project.area || "Not specified"}</p>
         <p>Client Email: {project.client.user.email}</p>
         <p>Applicants: {project._count?.applications || 0}</p>
       </div>
+
+      {project.work_mode === "offline" && project.address ? (
+        <p className="mt-2 text-sm text-slate-700">Address: {project.address}</p>
+      ) : null}
 
       {user?.role === "freelancer" && Number(project.required_skills_count) > 0 ? (
         <p className="mt-4 text-sm font-medium text-blue-700">

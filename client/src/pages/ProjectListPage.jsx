@@ -12,10 +12,24 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString();
 }
 
+function getWorkModeLabel(value) {
+  return value === "offline" ? "Office / Offline" : "Remote";
+}
+
+function getEngagementTypeLabel(value) {
+  return value === "part_time" ? "Part Time" : "Full Time";
+}
+
 function ProjectListPage() {
   const { user } = useAuth();
+  const isFreelancer = user?.role === "freelancer";
   const [projects, setProjects] = useState([]);
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState({
+    work_mode: "",
+    engagement_type: "",
+    area: "",
+  });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -23,7 +37,25 @@ function ProjectListPage() {
     const fetchProjects = async () => {
       try {
         setError("");
-        const response = await api.get("/api/projects");
+        setIsLoading(true);
+
+        const params = {};
+
+        if (isFreelancer) {
+          if (filters.work_mode) {
+            params.work_mode = filters.work_mode;
+          }
+
+          if (filters.engagement_type) {
+            params.engagement_type = filters.engagement_type;
+          }
+
+          if (filters.area.trim()) {
+            params.area = filters.area.trim();
+          }
+        }
+
+        const response = await api.get("/api/projects", { params });
         setProjects(response.data);
       } catch (requestError) {
         setError(requestError.response?.data?.message || "Failed to load projects");
@@ -33,7 +65,7 @@ function ProjectListPage() {
     };
 
     fetchProjects();
-  }, []);
+  }, [filters.area, filters.engagement_type, filters.work_mode, isFreelancer]);
 
   const filteredProjects = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -48,11 +80,29 @@ function ProjectListPage() {
 
       return (
         project.title.toLowerCase().includes(query) ||
+        String(project.area || "").toLowerCase().includes(query) ||
         requiredSkillNames.some((name) => name.includes(query)) ||
         techStackValues.some((item) => item.includes(query))
       );
     });
   }, [projects, search]);
+
+  const handleFilterChange = (event) => {
+    const { name, value } = event.target;
+
+    setFilters((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleResetFilters = () => {
+    setFilters({
+      work_mode: "",
+      engagement_type: "",
+      area: "",
+    });
+  };
 
   return (
     <section className="space-y-6">
@@ -71,6 +121,48 @@ function ProjectListPage() {
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
+
+        {isFreelancer ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-4">
+            <select
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              name="work_mode"
+              value={filters.work_mode}
+              onChange={handleFilterChange}
+            >
+              <option value="">All modes</option>
+              <option value="remote">Remote</option>
+              <option value="offline">Office / Offline</option>
+            </select>
+
+            <select
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              name="engagement_type"
+              value={filters.engagement_type}
+              onChange={handleFilterChange}
+            >
+              <option value="">All types</option>
+              <option value="full_time">Full Time</option>
+              <option value="part_time">Part Time</option>
+            </select>
+
+            <input
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              name="area"
+              value={filters.area}
+              onChange={handleFilterChange}
+              placeholder="Filter by area"
+            />
+
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Clear Filters
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {isLoading ? <p className="text-slate-600">Loading projects...</p> : null}
@@ -101,7 +193,14 @@ function ProjectListPage() {
             <div className="mt-4 flex flex-wrap gap-4 text-sm text-slate-700">
               <p>Budget: {formatCurrency(project.budget)}</p>
               <p>Deadline: {formatDate(project.deadline)}</p>
+              <p>Mode: {getWorkModeLabel(project.work_mode)}</p>
+              <p>Type: {getEngagementTypeLabel(project.engagement_type)}</p>
+              <p>Area: {project.area || "Not specified"}</p>
             </div>
+
+            {project.work_mode === "offline" && project.address ? (
+              <p className="mt-2 text-sm text-slate-700">Address: {project.address}</p>
+            ) : null}
 
             <div className="mt-4 space-y-3">
               <div>

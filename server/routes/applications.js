@@ -139,6 +139,7 @@ router.get("/project/:project_id", authMiddleware, async (req, res) => {
                 last_name: true,
                 username: true,
                 email: true,
+                profile_picture: true,
                 phone: true,
                 city: true,
                 pincode: true,
