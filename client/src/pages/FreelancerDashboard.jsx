@@ -85,19 +85,19 @@ function FreelancerDashboard() {
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <article className="stat-card rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Total Applications</p>
           <p className="mt-1 text-2xl font-semibold text-slate-900">{summary.totalApplications}</p>
         </article>
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <article className="stat-card rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Active Contracts</p>
           <p className="mt-1 text-2xl font-semibold text-slate-900">{summary.activeContracts}</p>
         </article>
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <article className="stat-card rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Completed Contracts</p>
           <p className="mt-1 text-2xl font-semibold text-slate-900">{summary.completedContracts}</p>
         </article>
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <article className="stat-card rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Average Rating</p>
           <p className="mt-1 text-2xl font-semibold text-slate-900">{summary.averageRating}</p>
         </article>

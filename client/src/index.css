@@ -1,3 +1,59 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+	body {
+		background-color: #f4f6fa;
+	}
+}
+
+@layer components {
+	.bg-white.border.border-slate-200 {
+		border-color: #e2e8f0;
+		border-width: 0.5px;
+		border-radius: 12px;
+	}
+
+	.stat-card {
+		position: relative;
+		overflow: hidden;
+	}
+
+	.stat-card::before {
+		content: "";
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		left: 0;
+		width: 3px;
+		background: #4ea8f7;
+	}
+}
+
+@layer utilities {
+	.bg-blue-600 {
+		background-color: #4ea8f7 !important;
+	}
+
+	.hover\:bg-blue-700:hover {
+		background-color: #3697f2 !important;
+	}
+
+	.text-blue-600 {
+		color: #4ea8f7 !important;
+	}
+
+	.hover\:text-blue-700:hover {
+		color: #3697f2 !important;
+	}
+
+	.border-blue-500,
+	.border-blue-600 {
+		border-color: #4ea8f7 !important;
+	}
+
+	.bg-blue-50 {
+		background-color: #edf6ff !important;
+	}
+}

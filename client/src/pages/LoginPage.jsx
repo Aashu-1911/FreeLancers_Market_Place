@@ -48,7 +48,9 @@ function LoginPage() {
       toast.success("Logged in successfully.");
 
       const fallbackPath = response.data?.user?.role === "client" ? "/dashboard/client" : "/dashboard/freelancer";
-      const redirectPath = location.state?.from?.pathname || fallbackPath;
+      const requestedPath = location.state?.from?.pathname;
+      const isPublicPath = ["/", "/home", "/login", "/register"].includes(requestedPath);
+      const redirectPath = requestedPath && !isPublicPath ? requestedPath : fallbackPath;
       navigate(redirectPath, { replace: true });
     } catch (requestError) {
       const message = requestError.response?.data?.message || "Login failed";

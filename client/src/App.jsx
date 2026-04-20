@@ -26,7 +26,7 @@ function App() {
   const authenticatedHomePath = user?.role === "client" ? "/dashboard/client" : "/dashboard/freelancer";
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-[#F4F6FA] text-slate-900">
       <Navbar />
       <LoadingSpinner />
 
@@ -42,8 +42,8 @@ function App() {
             path="/projects/:id"
             element={isAuthenticated && user?.role === "client" ? <Navigate to="/dashboard/client" replace /> : <ProjectDetailPage />}
           />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={isAuthenticated ? <Navigate to={authenticatedHomePath} replace /> : <RegisterPage />} />
+          <Route path="/login" element={isAuthenticated ? <Navigate to={authenticatedHomePath} replace /> : <LoginPage />} />
 
           <Route element={<PrivateRoute allowedRoles={["freelancer"]} />}>
             <Route path="/dashboard/freelancer" element={<FreelancerDashboard />} />

@@ -50,11 +50,11 @@ function HomePage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <article className="stat-card rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Total Projects</p>
           <p className="mt-1 text-3xl font-semibold text-slate-900">{stats.total_projects}</p>
         </article>
-        <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <article className="stat-card rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Total Freelancers</p>
           <p className="mt-1 text-3xl font-semibold text-slate-900">{stats.total_freelancers}</p>
         </article>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
 
 const initialState = {
   title: "",
@@ -18,15 +18,41 @@ const initialState = {
 };
 
 function PostProjectPage() {
+  const { user } = useAuth();
   const [form, setForm] = useState(initialState);
   const [skills, setSkills] = useState([]);
+  const [postedProjects, setPostedProjects] = useState([]);
   const [techStackInput, setTechStackInput] = useState("");
   const [selectedSkillId, setSelectedSkillId] = useState("");
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLoadingSkills, setIsLoadingSkills] = useState(true);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const navigate = useNavigate();
+
+  const formatCurrency = (value) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(
+      Number(value || 0)
+    );
+
+  const formatDate = (value) => {
+    if (!value) {
+      return "No deadline set";
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return "No deadline set";
+    }
+
+    return parsed.toLocaleDateString();
+  };
+
+  const toLabel = (value) =>
+    String(value || "")
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
 
   useEffect(() => {
     const fetchSkills = async () => {
@@ -42,6 +68,29 @@ function PostProjectPage() {
 
     fetchSkills();
   }, []);
+
+  useEffect(() => {
+    const fetchPostedProjects = async () => {
+      if (!user?.user_id) {
+        setPostedProjects([]);
+        setIsLoadingProjects(false);
+        return;
+      }
+
+      try {
+        const profileResponse = await api.get(`/api/profile/client/${user.user_id}`);
+        const clientId = profileResponse.data.client_id;
+        const projectsResponse = await api.get(`/api/projects/client/${clientId}`);
+        setPostedProjects(projectsResponse.data || []);
+      } catch (_requestError) {
+        toast.error("Unable to load posted projects right now.");
+      } finally {
+        setIsLoadingProjects(false);
+      }
+    };
+
+    fetchPostedProjects();
+  }, [user?.user_id]);
 
   const selectedSkillSet = useMemo(() => new Set(form.required_skill_ids), [form.required_skill_ids]);
 
@@ -141,13 +190,17 @@ function PostProjectPage() {
     setIsSubmitting(true);
 
     try {
-      await api.post("/api/projects", {
+      const response = await api.post("/api/projects", {
         ...form,
         budget: Number(form.budget),
       });
 
       toast.success("Project posted successfully.");
-      navigate("/client/manage-projects", { replace: true });
+      setPostedProjects((prev) => [response.data, ...prev]);
+      setForm(initialState);
+      setTechStackInput("");
+      setSelectedSkillId("");
+      setFieldErrors({});
     } catch (requestError) {
       const message = requestError.response?.data?.message || "Failed to post project";
       setError(message);
@@ -158,11 +211,12 @@ function PostProjectPage() {
   };
 
   return (
-    <section className="mx-auto max-w-2xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-2xl font-semibold text-slate-900">Post a Project</h2>
-      <p className="mt-2 text-sm text-slate-600">Create a project and start receiving freelancer applications.</p>
+    <section className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-2xl font-semibold text-slate-900">Post a Project</h2>
+        <p className="mt-2 text-sm text-slate-600">Create a project and start receiving freelancer applications.</p>
 
-      <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
         <label className="block text-sm font-medium text-slate-700">
           Title
           <input
@@ -402,7 +456,63 @@ function PostProjectPage() {
         >
           {isSubmitting ? "Posting..." : "Post Project"}
         </button>
-      </form>
+        </form>
+      </div>
+
+      <aside className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-slate-900">Posted Projects</h3>
+          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+            {postedProjects.length}
+          </span>
+        </div>
+
+        <p className="mt-2 text-sm text-slate-600">Your recently posted projects appear here.</p>
+
+        {isLoadingProjects ? <p className="mt-4 text-sm text-slate-600">Loading posted projects...</p> : null}
+
+        {!isLoadingProjects ? (
+          <div className="mt-4 space-y-3 lg:max-h-[72vh] lg:overflow-y-auto lg:pr-1">
+            {postedProjects.map((project) => (
+              <article
+                key={project.project_id}
+                className="rounded-lg border border-slate-200 bg-white p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <h4 className="text-sm font-semibold text-slate-900">{project.title}</h4>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                    {toLabel(project.project_status)}
+                  </span>
+                </div>
+
+                <p className="mt-1 text-xs text-slate-500 line-clamp-2">{project.description}</p>
+
+                <div className="mt-3 space-y-1 text-xs text-slate-600">
+                  <p>Budget: {formatCurrency(project.budget)}</p>
+                  <p>Deadline: {formatDate(project.deadline)}</p>
+                  <p>Work Mode: {toLabel(project.work_mode)}</p>
+                </div>
+
+                {Array.isArray(project.tech_stack) && project.tech_stack.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {project.tech_stack.slice(0, 4).map((item) => (
+                      <span key={`${project.project_id}-${item}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            ))}
+
+            {postedProjects.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                You have not posted any projects yet.
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </aside>
     </section>
   );
 }
