@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 
-const fields = ["first_name", "last_name", "email", "phone", "city", "pincode", "client_type"];
+const fields = ["first_name", "last_name", "email", "phone"];
 
 function toPublicFileUrl(value, cacheKey = null) {
   const trimmed = String(value || "").trim();
@@ -34,15 +34,31 @@ function toPublicFileUrl(value, cacheKey = null) {
   }
 }
 
+function normalizePortfolioUrl(value) {
+  const trimmed = String(value || "").trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
 function ClientProfilePage() {
   const { user, updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({});
   const [profilePictureFile, setProfilePictureFile] = useState(null);
+  const [resumeFile, setResumeFile] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
+  const [isUploadingResume, setIsUploadingResume] = useState(false);
   const [profilePictureVersion, setProfilePictureVersion] = useState(null);
 
   useEffect(() => {
@@ -60,9 +76,8 @@ function ClientProfilePage() {
           last_name: response.data.user.last_name || "",
           email: response.data.user.email || "",
           phone: response.data.user.phone || "",
-          city: response.data.user.city || "",
-          pincode: response.data.user.pincode || "",
-          client_type: response.data.client_type || "",
+          portfolio: response.data.portfolio || "",
+          resume: response.data.resume || "",
         });
       } catch (requestError) {
         const message = requestError.response?.data?.message || "Failed to load client profile";
@@ -83,6 +98,8 @@ function ClientProfilePage() {
     event.preventDefault();
 
     const nextErrors = {};
+    const normalizedPortfolioUrl = normalizePortfolioUrl(form.portfolio);
+
     if (!form.first_name?.trim()) {
       nextErrors.first_name = "First name is required.";
     }
@@ -92,6 +109,18 @@ function ClientProfilePage() {
     if (!/^\S+@\S+\.\S+$/.test(form.email || "")) {
       nextErrors.email = "Enter a valid email address.";
     }
+    if (normalizedPortfolioUrl) {
+      try {
+        const parsedUrl = new URL(normalizedPortfolioUrl);
+
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+          nextErrors.portfolio = "Portfolio link must start with http:// or https://";
+        }
+      } catch (_error) {
+        nextErrors.portfolio = "Enter a valid portfolio link.";
+      }
+    }
+
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       return;
@@ -110,13 +139,16 @@ function ClientProfilePage() {
         last_name: form.last_name || null,
         email: form.email || null,
         phone: form.phone || null,
-        city: form.city || null,
-        pincode: form.pincode || null,
-        client_type: form.client_type || "individual",
+        portfolio: normalizedPortfolioUrl || null,
       };
 
       const response = await api.put(`/api/profile/client/${profile.client_id}`, payload);
       setProfile(response.data);
+      setForm((prev) => ({
+        ...prev,
+        portfolio: response.data.portfolio || "",
+        resume: response.data.resume || "",
+      }));
       updateUser({
         first_name: response.data.user.first_name,
         last_name: response.data.user.last_name,
@@ -176,6 +208,42 @@ function ClientProfilePage() {
     }
   };
 
+  const handleResumeFileChange = (event) => {
+    const selectedFile = event.target.files?.[0] || null;
+    setResumeFile(selectedFile);
+  };
+
+  const handleResumeUpload = async () => {
+    if (!profile?.client_id || !resumeFile) {
+      return;
+    }
+
+    setIsUploadingResume(true);
+
+    try {
+      setError("");
+
+      const payload = new FormData();
+      payload.append("resume", resumeFile);
+
+      const response = await api.post(`/api/profile/client/${profile.client_id}/resume`, payload);
+
+      setProfile(response.data.client || profile);
+      setForm((prev) => ({
+        ...prev,
+        resume: response.data.resume || prev.resume,
+      }));
+      setResumeFile(null);
+      toast.success("Resume uploaded successfully.");
+    } catch (requestError) {
+      const message = requestError.response?.data?.message || "Failed to upload resume";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsUploadingResume(false);
+    }
+  };
+
   if (!profile) {
     return <p className="text-slate-600">Loading client profile...</p>;
   }
@@ -189,7 +257,7 @@ function ClientProfilePage() {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <h2 className="text-2xl font-semibold text-slate-900">Client Profile</h2>
-      <p className="mt-2 text-sm text-slate-600">Update your account and organization details.</p>
+      <p className="mt-2 text-sm text-slate-600">Update your account details, portfolio link, and resume.</p>
 
       <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
         <p className="text-sm font-semibold text-slate-800">Profile Picture</p>
@@ -241,6 +309,68 @@ function ClientProfilePage() {
             {fieldErrors[field] ? <p className="mt-1 text-xs text-red-600">{fieldErrors[field]}</p> : null}
           </label>
         ))}
+
+        <label className="text-sm font-medium text-slate-700 sm:col-span-2">
+          Portfolio Link
+          <input
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2"
+            name="portfolio"
+            type="url"
+            placeholder="https://your-portfolio.com"
+            value={form.portfolio || ""}
+            onChange={(event) => {
+              handleChange(event);
+              setFieldErrors((prev) => ({ ...prev, portfolio: null }));
+            }}
+          />
+          {fieldErrors.portfolio ? <p className="mt-1 text-xs text-red-600">{fieldErrors.portfolio}</p> : null}
+          {form.portfolio ? (
+            <a
+              className="mt-2 inline-block text-xs font-medium text-blue-700 hover:underline"
+              href={normalizePortfolioUrl(form.portfolio)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open portfolio
+            </a>
+          ) : null}
+        </label>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 sm:col-span-2">
+          <p className="text-sm font-semibold text-slate-800">Resume</p>
+          <p className="mt-1 text-xs text-slate-600">Upload PDF, DOC, or DOCX (max 5MB).</p>
+
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              onChange={handleResumeFileChange}
+              className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+            />
+
+            <button
+              type="button"
+              onClick={handleResumeUpload}
+              disabled={!resumeFile || isUploadingResume}
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isUploadingResume ? "Uploading..." : "Upload Resume"}
+            </button>
+          </div>
+
+          {form.resume ? (
+            <a
+              className="mt-3 inline-block text-sm font-medium text-blue-700 hover:underline"
+              href={toPublicFileUrl(form.resume)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View current resume
+            </a>
+          ) : (
+            <p className="mt-3 text-sm text-slate-500">No resume uploaded yet.</p>
+          )}
+        </div>
 
         {error ? <p className="text-sm text-red-600 sm:col-span-2">{error}</p> : null}
 

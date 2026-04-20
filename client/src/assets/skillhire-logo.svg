@@ -1,0 +1,22 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skillhireBg" x1="12" y1="12" x2="84" y2="84" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E2A3A"/>
+      <stop offset="1" stop-color="#30455E"/>
+    </linearGradient>
+    <linearGradient id="skillhireAccent" x1="26" y1="29" x2="72" y2="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7CC5FF"/>
+      <stop offset="1" stop-color="#4EA8F7"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="8" y="8" width="80" height="80" rx="24" fill="url(#skillhireBg)"/>
+
+  <path d="M34 33C34 29.6863 36.6863 27 40 27H56C59.3137 27 62 29.6863 62 33V36H34V33Z" fill="#BFD5EA"/>
+  <rect x="22" y="36" width="52" height="35" rx="10" fill="url(#skillhireAccent)"/>
+  <path d="M22 48H74" stroke="#DDF0FF" stroke-width="2.5" stroke-linecap="round"/>
+
+  <path d="M38.5 55.5L45 62L57.5 49.5" stroke="#11365B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="8" y="8" width="80" height="80" rx="24" stroke="#4A617A" stroke-width="1"/>
+</svg>

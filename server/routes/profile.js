@@ -284,7 +284,13 @@ const freelancerProfileValidation = [
     .withMessage("portfolio must be a valid URL"),
 ];
 
-const clientProfileValidation = [...commonProfileValidation];
+const clientProfileValidation = [
+  ...commonProfileValidation,
+  body("portfolio")
+    .optional({ nullable: true })
+    .custom((value) => !value || isValidHttpUrl(value))
+    .withMessage("portfolio must be a valid URL"),
+];
 
 router.post(
   "/photo",
@@ -577,6 +583,91 @@ router.post(
 }
 );
 
+router.post(
+  "/client/:id/resume",
+  authMiddleware,
+  (req, res, next) => {
+    uploadResume.single("resume")(req, res, (error) => {
+      if (!error) {
+        next();
+        return;
+      }
+
+      if (error.code === "LIMIT_FILE_SIZE") {
+        res.status(400).json({ message: "Resume file must be 5MB or smaller" });
+        return;
+      }
+
+      if (error.message && error.message.includes("Only PDF, DOC, and DOCX files are allowed")) {
+        res.status(400).json({ message: error.message });
+        return;
+      }
+
+      res.status(500).json({ message: "Failed to upload resume", error: error.message });
+    });
+  },
+  async (req, res) => {
+    try {
+      const id = parseId(req.params.id);
+
+      if (!id) {
+        return res.status(400).json({ message: "Invalid client id" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: "resume file is required" });
+      }
+
+      const existingClient = await findClientByClientIdOrUserId(id);
+
+      if (!existingClient) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      if (existingClient.user_id !== req.user.user_id) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const resumePath = getResumePublicPath(req.file.filename);
+
+      const updatedClient = await prisma.client.update({
+        where: {
+          client_id: existingClient.client_id,
+        },
+        data: {
+          resume: resumePath,
+        },
+        include: {
+          user: {
+            select: {
+              user_id: true,
+              first_name: true,
+              last_name: true,
+              username: true,
+              email: true,
+              profile_picture: true,
+              phone: true,
+              city: true,
+              pincode: true,
+              created_at: true,
+            },
+          },
+        },
+      });
+
+      removePreviousResumeFile(existingClient.resume);
+
+      return res.status(200).json({
+        message: "Resume uploaded successfully",
+        resume: updatedClient.resume,
+        client: updatedClient,
+      });
+    } catch (error) {
+      return res.status(500).json({ message: "Failed to upload resume", error: error.message });
+    }
+  }
+);
+
 router.get("/client/:id", authMiddleware, async (req, res) => {
   try {
     const id = parseId(req.params.id);
@@ -636,8 +727,8 @@ router.put("/client/:id", authMiddleware, clientProfileValidation, validateReque
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    const userPayload = pickDefined(req.body, ["first_name", "last_name", "email", "phone", "city", "pincode"]);
-    const clientPayload = pickDefined(req.body, ["client_type"]);
+    const userPayload = pickDefined(req.body, ["first_name", "last_name", "email", "phone"]);
+    const clientPayload = pickDefined(req.body, ["portfolio"]);
 
     await prisma.$transaction(async (tx) => {
       if (Object.keys(userPayload).length > 0) {

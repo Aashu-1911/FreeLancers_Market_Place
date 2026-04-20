@@ -44,6 +44,8 @@ model Client {
   client_id      Int         @id @default(autoincrement())
   user_id        Int         @unique
   client_type    String
+  portfolio      String?
+  resume         String?
   user           User        @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
   projects       Project[]
   contracts      Contract[]
