@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import api from "../lib/api.js";
-import skillHireLogo from "../assets/skillhire-logo.svg";
+import skillHireLogo from "../assets/skillhire-logo-wordmark.svg";
 
 function toPublicFileUrl(value, cacheKey = null) {
   const trimmed = String(value || "").trim();
@@ -96,10 +96,7 @@ function Navbar() {
   return (
     <header className="border-b border-[#2B3A4C] bg-[#1E2A3A] text-slate-100 shadow-sm">
       <nav className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-        <div className="flex items-center gap-2.5">
-          <img src={skillHireLogo} alt="SkillHire logo" className="h-9 w-9" />
-          <h1 className="text-xl font-semibold tracking-wide text-white">SkillHire</h1>
-        </div>
+        <img src={skillHireLogo} alt="SkillHire professional logo" className="h-11 w-auto" />
 
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-medium text-slate-200">
           {!isAuthenticated ? (
