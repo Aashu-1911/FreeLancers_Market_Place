@@ -21,7 +21,31 @@ const createReviewValidation = [
   body("user_id").isInt({ min: 1 }).withMessage("user_id must be a positive integer"),
   body("rating").isInt({ min: 1, max: 5 }).withMessage("rating must be between 1 and 5"),
   body("comment").optional({ nullable: true }).trim(),
+  body("report_issue").optional().isBoolean().withMessage("report_issue must be true or false"),
+  body("report_reason").optional({ nullable: true }).trim(),
 ];
+
+function withReportMeta(review) {
+  const comment = String(review.comment || "");
+  const marker = "Reported Issue:";
+  const markerIndex = comment.indexOf(marker);
+
+  if (markerIndex === -1) {
+    return {
+      ...review,
+      report_issue: false,
+      report_reason: null,
+    };
+  }
+
+  const reportReason = comment.slice(markerIndex + marker.length).trim() || null;
+
+  return {
+    ...review,
+    report_issue: Boolean(reportReason),
+    report_reason: reportReason,
+  };
+}
 
 router.post("/", authMiddleware, createReviewValidation, validateRequest, async (req, res) => {
   try {
@@ -32,7 +56,9 @@ router.post("/", authMiddleware, createReviewValidation, validateRequest, async 
     const contractId = parseId(req.body.contract_id);
     const userId = parseId(req.body.user_id);
     const rating = parseRating(req.body.rating);
-    const comment = req.body.comment ?? null;
+    const rawComment = req.body.comment ?? null;
+    const reportIssue = req.body.report_issue === true;
+    const reportReason = req.body.report_reason ? String(req.body.report_reason).trim() : null;
 
     if (!contractId || !userId || !rating) {
       return res.status(400).json({ message: "contract_id, user_id, and rating are required" });
@@ -40,6 +66,10 @@ router.post("/", authMiddleware, createReviewValidation, validateRequest, async 
 
     if (rating < 1 || rating > 5) {
       return res.status(400).json({ message: "rating must be between 1 and 5" });
+    }
+
+    if (reportIssue && !reportReason) {
+      return res.status(400).json({ message: "report_reason is required when reporting an issue" });
     }
 
     if (userId !== req.user.user_id) {
@@ -78,6 +108,19 @@ router.post("/", authMiddleware, createReviewValidation, validateRequest, async 
       return res.status(409).json({ message: "Review already exists for this contract" });
     }
 
+    const commentParts = [];
+    const normalizedComment = rawComment ? String(rawComment).trim() : "";
+
+    if (normalizedComment) {
+      commentParts.push(normalizedComment);
+    }
+
+    if (reportIssue && reportReason) {
+      commentParts.push(`Reported Issue: ${reportReason}`);
+    }
+
+    const comment = commentParts.length > 0 ? commentParts.join("\n\n") : null;
+
     const review = await prisma.review.create({
       data: {
         contract_id: contractId,
@@ -96,7 +139,7 @@ router.post("/", authMiddleware, createReviewValidation, validateRequest, async 
       },
     });
 
-    return res.status(201).json(review);
+    return res.status(201).json(withReportMeta(review));
   } catch (error) {
     return res.status(500).json({ message: "Failed to submit review", error: error.message });
   }
@@ -132,7 +175,7 @@ router.get("/contract/:contract_id", async (req, res) => {
       return res.status(404).json({ message: "No review found for this contract" });
     }
 
-    return res.status(200).json(review);
+    return res.status(200).json(withReportMeta(review));
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch contract review", error: error.message });
   }
@@ -176,7 +219,7 @@ router.get("/freelancer/:freelancer_id", async (req, res) => {
       },
     });
 
-    return res.status(200).json(reviews);
+    return res.status(200).json(reviews.map(withReportMeta));
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch freelancer reviews", error: error.message });
   }

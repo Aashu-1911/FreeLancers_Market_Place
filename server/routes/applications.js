@@ -11,6 +11,92 @@ function parseId(rawId) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+async function getFreelancerRatingMap(freelancerIds) {
+  if (!Array.isArray(freelancerIds) || freelancerIds.length === 0) {
+    return {};
+  }
+
+  const reviews = await prisma.review.findMany({
+    where: {
+      contract: {
+        freelancer_id: {
+          in: freelancerIds,
+        },
+      },
+    },
+    select: {
+      rating: true,
+      contract: {
+        select: {
+          freelancer_id: true,
+        },
+      },
+    },
+  });
+
+  const totalsByFreelancer = reviews.reduce((acc, review) => {
+    const freelancerId = review.contract.freelancer_id;
+
+    if (!acc[freelancerId]) {
+      acc[freelancerId] = {
+        sum: 0,
+        count: 0,
+      };
+    }
+
+    acc[freelancerId].sum += Number(review.rating || 0);
+    acc[freelancerId].count += 1;
+    return acc;
+  }, {});
+
+  return freelancerIds.reduce((acc, freelancerId) => {
+    const totals = totalsByFreelancer[freelancerId];
+
+    if (!totals || totals.count === 0) {
+      acc[freelancerId] = {
+        average_rating: null,
+        rating_count: 0,
+      };
+      return acc;
+    }
+
+    acc[freelancerId] = {
+      average_rating: Number((totals.sum / totals.count).toFixed(1)),
+      rating_count: totals.count,
+    };
+    return acc;
+  }, {});
+}
+
+async function getFreelancerWorkScoreMap(freelancerIds) {
+  if (!Array.isArray(freelancerIds) || freelancerIds.length === 0) {
+    return {};
+  }
+
+  const completedContracts = await prisma.contract.findMany({
+    where: {
+      freelancer_id: {
+        in: freelancerIds,
+      },
+      status: "completed",
+    },
+    select: {
+      freelancer_id: true,
+    },
+  });
+
+  const countsByFreelancer = completedContracts.reduce((acc, contract) => {
+    const freelancerId = contract.freelancer_id;
+    acc[freelancerId] = (acc[freelancerId] || 0) + 1;
+    return acc;
+  }, {});
+
+  return freelancerIds.reduce((acc, freelancerId) => {
+    acc[freelancerId] = countsByFreelancer[freelancerId] || 0;
+    return acc;
+  }, {});
+}
+
 const createApplicationValidation = [
   body("project_id").isInt({ min: 1 }).withMessage("project_id must be a positive integer"),
   body("freelancer_id").isInt({ min: 1 }).withMessage("freelancer_id must be a positive integer"),
@@ -163,7 +249,26 @@ router.get("/project/:project_id", authMiddleware, async (req, res) => {
       },
     });
 
-    return res.status(200).json(applications);
+    const freelancerIds = [...new Set(applications.map((application) => application.freelancer.freelancer_id))];
+    const ratingMap = await getFreelancerRatingMap(freelancerIds);
+    const workScoreMap = await getFreelancerWorkScoreMap(freelancerIds);
+
+    const enrichedApplications = applications.map((application) => {
+      const freelancerId = application.freelancer.freelancer_id;
+      const ratingInfo = ratingMap[freelancerId] || { average_rating: null, rating_count: 0 };
+
+      return {
+        ...application,
+        freelancer: {
+          ...application.freelancer,
+          average_rating: ratingInfo.average_rating,
+          rating_count: ratingInfo.rating_count,
+          work_score: workScoreMap[freelancerId] || 0,
+        },
+      };
+    });
+
+    return res.status(200).json(enrichedApplications);
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch applicants", error: error.message });
   }

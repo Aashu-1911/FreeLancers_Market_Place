@@ -34,6 +34,19 @@ function toPublicFileUrl(value) {
   return `${apiBaseUrl}${normalizedPath}`;
 }
 
+function formatFreelancerRating(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return parsed.toFixed(1);
+}
+
 function ManageProjectsPage() {
   const { user } = useAuth();
   const [clientId, setClientId] = useState(null);
@@ -383,6 +396,14 @@ function ManageProjectsPage() {
                         {application.freelancer.user.first_name} {application.freelancer.user.last_name}
                       </p>
                       <p className="mt-1 text-sm text-slate-600">@{application.freelancer.user.username || "user"}</p>
+                      <p className="mt-1 text-sm font-semibold text-amber-600">
+                        {application.freelancer.rating_count > 0
+                          ? `★ ${formatFreelancerRating(application.freelancer.average_rating)}`
+                          : "No ratings yet"}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-600">
+                        Work Score: {application.freelancer.work_score || 0}
+                      </p>
                     </button>
                   </div>
                   <p className="mt-2 text-xs text-slate-500">

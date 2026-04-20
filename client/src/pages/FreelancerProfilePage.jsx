@@ -109,6 +109,9 @@ function FreelancerProfilePage() {
   const [isUploadingProfilePicture, setIsUploadingProfilePicture] = useState(false);
   const [isUploadingResume, setIsUploadingResume] = useState(false);
   const [profilePictureVersion, setProfilePictureVersion] = useState(null);
+  const [averageRating, setAverageRating] = useState(null);
+  const [ratingCount, setRatingCount] = useState(0);
+  const [workScore, setWorkScore] = useState(0);
 
   const assignedSkillIds = useMemo(
     () => new Set((profile?.skills || []).map((entry) => entry.skill_id)),
@@ -125,13 +128,32 @@ function FreelancerProfilePage() {
       return;
     }
 
-    const [profileResponse, skillsResponse] = await Promise.all([
-      api.get(`/api/profile/freelancer/${user.user_id}`),
+    const profileResponse = await api.get(`/api/profile/freelancer/${user.user_id}`);
+    const freelancerId = profileResponse.data.freelancer_id;
+
+    const [skillsResponse, reviewsResponse, contractsResponse] = await Promise.all([
       api.get("/api/skills"),
+      api.get(`/api/reviews/freelancer/${freelancerId}`),
+      api.get(`/api/contracts/freelancer/${freelancerId}`),
     ]);
 
     setProfile(profileResponse.data);
     setSkills(skillsResponse.data);
+
+    const reviews = reviewsResponse.data || [];
+    const completedContracts = (contractsResponse.data || []).filter((contract) => contract.status === "completed").length;
+
+    if (reviews.length > 0) {
+      const average = reviews.reduce((sum, review) => sum + Number(review.rating || 0), 0) / reviews.length;
+      setAverageRating(Number(average.toFixed(1)));
+      setRatingCount(reviews.length);
+    } else {
+      setAverageRating(null);
+      setRatingCount(0);
+    }
+
+    setWorkScore(completedContracts);
+
     setForm({
       first_name: profileResponse.data.user.first_name || "",
       last_name: profileResponse.data.user.last_name || "",
@@ -410,8 +432,20 @@ function FreelancerProfilePage() {
   return (
     <section className="space-y-6">
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-2xl font-semibold text-slate-900">Freelancer Profile</h2>
-        <p className="mt-2 text-sm text-slate-600">Manage your personal and professional details.</p>
+        <h2 className="text-2xl font-semibold text-slate-900">
+          {profile.user.first_name} {profile.user.last_name}
+        </h2>
+        <p className="mt-2 text-sm text-slate-600">
+          @{profile.user.username || "user"} • Manage your personal and professional details.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+            {ratingCount > 0 && averageRating !== null ? `★ ${averageRating} (${ratingCount})` : "No ratings yet"}
+          </span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            Work Score: {workScore}
+          </span>
+        </div>
 
         <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
           <p className="text-sm font-semibold text-slate-800">Profile Picture</p>

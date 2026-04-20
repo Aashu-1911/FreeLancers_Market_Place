@@ -10,6 +10,21 @@ function formatCurrency(value) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(amount);
 }
 
+function StageNode({ label, isDone }) {
+  return (
+    <div className="relative z-10 flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
+      <span
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${
+          isDone ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
+        }`}
+      >
+        {isDone ? "✓" : "•"}
+      </span>
+      <span className={`text-xs font-medium ${isDone ? "text-emerald-700" : "text-slate-500"}`}>{label}</span>
+    </div>
+  );
+}
+
 function ContractPage() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -67,6 +82,8 @@ function ContractPage() {
     return <p className="text-slate-600">Contract not found.</p>;
   }
 
+  const hasCompletedPayment = (contract.payments || []).some((payment) => payment.payment_status === "completed");
+
   return (
     <section className="space-y-6">
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -75,6 +92,18 @@ function ContractPage() {
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase text-slate-700">
             {contract.status}
           </span>
+        </div>
+
+        <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contract Flow</p>
+          <div className="relative mt-4">
+            <div className="absolute left-0 right-0 top-4 h-0.5 bg-slate-300" />
+            <div className="relative flex items-start gap-2">
+              <StageNode label="Contract Formed" isDone={true} />
+              <StageNode label="Work Finished" isDone={contract.status === "completed"} />
+              <StageNode label="Payment Successful" isDone={hasCompletedPayment} />
+            </div>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-4 text-sm text-slate-700 sm:grid-cols-2">
@@ -119,9 +148,15 @@ function ContractPage() {
         ) : null}
       </div>
 
-      <PaymentSection contractId={contract.contract_id} userRole={user?.role} agreedAmount={contract.agreed_amount} />
+      <PaymentSection
+        contractId={contract.contract_id}
+        userRole={user?.role}
+        agreedAmount={contract.agreed_amount}
+        contractStatus={contract.status}
+        onPaymentUpdated={loadContract}
+      />
 
-      {user?.role === "client" && contract.status === "completed" ? (
+      {user?.role === "client" && contract.status === "completed" && hasCompletedPayment ? (
         <ReviewForm contractId={contract.contract_id} reviewerUserId={user.user_id} />
       ) : null}
     </section>

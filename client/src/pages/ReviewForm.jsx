@@ -10,11 +10,19 @@ function renderRatingBar(rating) {
 function ReviewForm({ contractId, reviewerUserId }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
+  const [highlights, setHighlights] = useState([]);
+  const [reportIssue, setReportIssue] = useState(false);
+  const [reportReason, setReportReason] = useState("");
   const [existingReview, setExistingReview] = useState(null);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const highlightOptions = ["Communication", "Delivery", "Quality", "Professionalism", "Collaboration"];
+
+  const toggleHighlight = (value) => {
+    setHighlights((prev) => (prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]));
+  };
 
   useEffect(() => {
     const fetchExistingReview = async () => {
@@ -44,16 +52,37 @@ function ReviewForm({ contractId, reviewerUserId }) {
       return;
     }
 
+    if (reportIssue && !reportReason.trim()) {
+      setError("Please provide a reason for reporting this contract.");
+      return;
+    }
+
     try {
       setError("");
       setSuccessMessage("");
       setIsSubmitting(true);
 
+      const commentParts = [];
+
+      if (comment.trim()) {
+        commentParts.push(comment.trim());
+      }
+
+      if (highlights.length > 0) {
+        commentParts.push(`Highlights: ${highlights.join(", ")}`);
+      }
+
+      if (reportIssue && reportReason.trim()) {
+        commentParts.push(`Reported Issue: ${reportReason.trim()}`);
+      }
+
       const response = await api.post("/api/reviews", {
         contract_id: contractId,
         user_id: reviewerUserId,
         rating,
-        comment: comment || null,
+        comment: commentParts.join("\n\n") || null,
+        report_issue: reportIssue,
+        report_reason: reportReason.trim() || null,
       });
 
       setExistingReview(response.data);
@@ -103,11 +132,31 @@ function ReviewForm({ contractId, reviewerUserId }) {
                       : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                   }`}
                 >
-                  {value}
+                  {value} {"★"}
                 </button>
               ))}
             </div>
             <p className="mt-2 text-sm text-slate-600">Selected: {renderRatingBar(rating)}</p>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-slate-700">What went well?</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {highlightOptions.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => toggleHighlight(item)}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                    highlights.includes(item)
+                      ? "border-blue-600 bg-blue-50 text-blue-700"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
 
           <label className="block text-sm font-medium text-slate-700">
@@ -119,6 +168,26 @@ function ReviewForm({ contractId, reviewerUserId }) {
               placeholder="Share your feedback about this contract"
             />
           </label>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input
+                type="checkbox"
+                checked={reportIssue}
+                onChange={(event) => setReportIssue(event.target.checked)}
+              />
+              Report an issue with this contract
+            </label>
+
+            {reportIssue ? (
+              <textarea
+                className="mt-3 min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                value={reportReason}
+                onChange={(event) => setReportReason(event.target.value)}
+                placeholder="Describe the issue for admin review"
+              />
+            ) : null}
+          </div>
 
           {error ? <p className="text-sm text-red-600">{error}</p> : null}
           {successMessage ? <p className="text-sm text-emerald-700">{successMessage}</p> : null}

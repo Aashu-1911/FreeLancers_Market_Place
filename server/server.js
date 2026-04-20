@@ -15,6 +15,7 @@ const contractRoutes = require("./routes/contracts");
 const paymentRoutes = require("./routes/payments");
 const reviewRoutes = require("./routes/reviews");
 const statsRoutes = require("./routes/stats");
+const notificationRoutes = require("./routes/notifications");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
 
 dotenv.config();
@@ -99,6 +100,7 @@ app.use("/api/contracts", contractRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/stats", statsRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.get("/health", async (_req, res) => {
   try {

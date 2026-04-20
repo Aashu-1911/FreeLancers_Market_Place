@@ -19,6 +19,19 @@ function normalizeUrl(value) {
   return `https://${trimmed}`;
 }
 
+function formatFreelancerRating(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return parsed.toFixed(1);
+}
+
 function FreelancerProfilePreviewModal({ isOpen, freelancer, onClose }) {
   const skills = useMemo(
     () => (freelancer?.skills || []).map((entry) => entry.skill.skill_name),
@@ -33,6 +46,7 @@ function FreelancerProfilePreviewModal({ isOpen, freelancer, onClose }) {
   const profilePictureUrl = normalizeUrl(freelancer.user.profile_picture);
   const portfolioUrl = normalizeUrl(freelancer.portfolio);
   const resumeUrl = normalizeUrl(freelancer.resume);
+  const ratingValue = formatFreelancerRating(freelancer.average_rating);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
@@ -55,6 +69,10 @@ function FreelancerProfilePreviewModal({ isOpen, freelancer, onClose }) {
                 {freelancer.user.first_name} {freelancer.user.last_name}
               </h3>
               <p className="text-sm text-slate-600">@{freelancer.user.username || "user"}</p>
+              <p className="mt-1 text-sm font-semibold text-amber-600">
+                {freelancer.rating_count > 0 && ratingValue ? `★ ${ratingValue}` : "No ratings yet"}
+              </p>
+              <p className="mt-1 text-xs font-semibold text-slate-600">Work Score: {freelancer.work_score || 0}</p>
             </div>
           </div>
 

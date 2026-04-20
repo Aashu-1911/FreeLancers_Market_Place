@@ -30,13 +30,29 @@ const paymentStatusValues = ["pending", "completed"];
 const createPaymentValidation = [
   body("contract_id").isInt({ min: 1 }).withMessage("contract_id must be a positive integer"),
   body("amount").isFloat({ gt: 0 }).withMessage("amount must be a positive number"),
-  body("payment_status").optional().isIn(paymentStatusValues).withMessage("payment_status must be pending or completed"),
-  body("transaction_date").optional().isISO8601().withMessage("transaction_date must be a valid date"),
 ];
 
 const updatePaymentValidation = [
   body("payment_status").isIn(paymentStatusValues).withMessage("payment_status must be pending or completed"),
 ];
+
+function buildTransactionId(payment) {
+  const parsedDate = new Date(payment.transaction_date || Date.now());
+  const safeDate = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+  const datePart = safeDate.toISOString().slice(0, 10).replace(/-/g, "");
+  const paymentPart = String(payment.payment_id || 0).padStart(6, "0");
+  return `TXN-${datePart}-${paymentPart}`;
+}
+
+function withPaymentMeta(payment) {
+  const status = payment.payment_status === "completed" ? "completed" : "pending";
+  return {
+    ...payment,
+    payment_status: status,
+    transaction_id: buildTransactionId(payment),
+    remark: status === "completed" ? "Payment completed successfully." : "Payment is pending.",
+  };
+}
 
 async function canAccessContract(contractId, user) {
   const contract = await prisma.contract.findUnique({
@@ -72,19 +88,9 @@ router.post("/", authMiddleware, createPaymentValidation, validateRequest, async
 
     const contractId = parseId(req.body.contract_id);
     const amount = parseAmount(req.body.amount);
-    const paymentStatus = req.body.payment_status || "pending";
-    const transactionDate = req.body.transaction_date ? parseDate(req.body.transaction_date) : new Date();
 
     if (!contractId || !amount) {
       return res.status(400).json({ message: "contract_id and amount are required" });
-    }
-
-    if (!transactionDate) {
-      return res.status(400).json({ message: "Invalid transaction_date" });
-    }
-
-    if (!["pending", "completed"].includes(paymentStatus)) {
-      return res.status(400).json({ message: "payment_status must be pending or completed" });
     }
 
     const access = await canAccessContract(contractId, req.user);
@@ -93,16 +99,31 @@ router.post("/", authMiddleware, createPaymentValidation, validateRequest, async
       return res.status(access.status).json({ message: access.reason });
     }
 
+    if (access.contract.status !== "completed") {
+      return res.status(400).json({ message: "Mark work as finished before adding payment." });
+    }
+
+    const existingCompletedPayment = await prisma.payment.findFirst({
+      where: {
+        contract_id: contractId,
+        payment_status: "completed",
+      },
+    });
+
+    if (existingCompletedPayment) {
+      return res.status(409).json({ message: "Payment is already completed for this contract." });
+    }
+
     const payment = await prisma.payment.create({
       data: {
         contract_id: contractId,
         amount,
-        payment_status: paymentStatus,
-        transaction_date: transactionDate,
+        payment_status: "completed",
+        transaction_date: new Date(),
       },
     });
 
-    return res.status(201).json(payment);
+    return res.status(201).json(withPaymentMeta(payment));
   } catch (error) {
     return res.status(500).json({ message: "Failed to create payment", error: error.message });
   }
@@ -131,7 +152,7 @@ router.get("/contract/:contract_id", authMiddleware, async (req, res) => {
       },
     });
 
-    return res.status(200).json(payments);
+    return res.status(200).json(payments.map(withPaymentMeta));
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch payments", error: error.message });
   }
@@ -171,6 +192,10 @@ router.put("/:id", authMiddleware, updatePaymentValidation, validateRequest, asy
       return res.status(access.status).json({ message: access.reason });
     }
 
+    if (nextStatus === "completed" && access.contract.status !== "completed") {
+      return res.status(400).json({ message: "Mark work as finished before completing payment." });
+    }
+
     const updatedPayment = await prisma.payment.update({
       where: {
         payment_id: paymentId,
@@ -180,7 +205,7 @@ router.put("/:id", authMiddleware, updatePaymentValidation, validateRequest, asy
       },
     });
 
-    return res.status(200).json(updatedPayment);
+    return res.status(200).json(withPaymentMeta(updatedPayment));
   } catch (error) {
     return res.status(500).json({ message: "Failed to update payment", error: error.message });
   }
