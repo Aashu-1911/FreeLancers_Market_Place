@@ -16,6 +16,6 @@
   <path d="M33 45.5L40 52.5L53 39.5" stroke="#143A5E" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>
   <rect x="6" y="6" width="72" height="72" rx="20" stroke="#4A617A" stroke-width="1"/>
 
-  <text x="96" y="41" fill="#FFFFFF" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="0.4">SkillHire</text>
-  <text x="98" y="62" fill="#9FB8D1" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="500" letter-spacing="1.5">TALENT MARKETPLACE</text>
+  <text x="96" y="48" fill="#FFFFFF" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="52" font-weight="700" letter-spacing="0.2">Skill</text>
+  <text x="223" y="48" fill="#4EA8F7" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="52" font-weight="700" letter-spacing="0.2">Hire</text>
 </svg>

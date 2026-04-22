@@ -3,6 +3,8 @@ const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
 const validateRequest = require("../middleware/validateRequest");
+const { sendMail } = require("../utils/mailer");
+const { generateOfferLetter } = require("../utils/offerLetterTemplate");
 
 const router = express.Router();
 
@@ -217,6 +219,68 @@ router.post("/", authMiddleware, createContractValidation, validateRequest, asyn
 
       return newContract;
     });
+
+    try {
+      const [freelancerProfile, clientProfile, projectDetails] = await Promise.all([
+        prisma.freelancer.findUnique({
+          where: { freelancer_id: freelancerId },
+          include: {
+            user: {
+              select: {
+                email: true,
+                first_name: true,
+              },
+            },
+          },
+        }),
+        prisma.client.findUnique({
+          where: { client_id: clientId },
+          include: {
+            user: {
+              select: {
+                first_name: true,
+                last_name: true,
+              },
+            },
+          },
+        }),
+        prisma.project.findUnique({
+          where: { project_id: projectId },
+          select: {
+            title: true,
+          },
+        }),
+      ]);
+
+      const freelancerEmail = freelancerProfile?.user?.email;
+
+      if (freelancerEmail) {
+        const clientFirstName = clientProfile?.user?.first_name || "";
+        const clientLastName = clientProfile?.user?.last_name || "";
+        const clientName = `${clientFirstName} ${clientLastName}`.trim() || "Client";
+        const htmlContent = generateOfferLetter({
+          freelancerName: freelancerProfile?.user?.first_name || "Freelancer",
+          clientName,
+          projectTitle: projectDetails?.title || "Untitled Project",
+          agreedAmount: createdContract.agreed_amount,
+          startDate: createdContract.start_date,
+          endDate: createdContract.end_date,
+          contractId: createdContract.contract_id,
+        });
+
+        await sendMail(
+          freelancerEmail,
+          "You have received a job offer on SkillHire",
+          htmlContent
+        );
+      } else {
+        console.warn(
+          `Offer letter email skipped: missing freelancer email for freelancer_id=${freelancerId}`
+        );
+      }
+    } catch (mailError) {
+      console.error("Failed to send contract offer email:", mailError);
+    }
 
     return res.status(201).json(createdContract);
   } catch (error) {
