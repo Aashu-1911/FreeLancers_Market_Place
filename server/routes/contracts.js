@@ -5,6 +5,7 @@ const authMiddleware = require("../middleware/auth");
 const validateRequest = require("../middleware/validateRequest");
 const { sendMail } = require("../utils/mailer");
 const { generateOfferLetter } = require("../utils/offerLetterTemplate");
+const { buildWorkFinishedEmail } = require("../utils/contractEmailTemplates");
 
 const router = express.Router();
 
@@ -536,6 +537,7 @@ router.put("/:id/status", authMiddleware, updateContractStatusValidation, valida
           include: {
             user: {
               select: {
+                user_id: true,
                 first_name: true,
                 last_name: true,
                 username: true,
@@ -562,6 +564,33 @@ router.put("/:id/status", authMiddleware, updateContractStatusValidation, valida
         },
       },
     });
+
+    if (contract.status !== "completed" && nextStatus === "completed") {
+      try {
+        const freelancerEmail = updatedContract.freelancer?.user?.email;
+
+        if (freelancerEmail) {
+          const freelancerName = updatedContract.freelancer?.user?.first_name || "Freelancer";
+          const clientFirstName = updatedContract.client?.user?.first_name || "";
+          const clientLastName = updatedContract.client?.user?.last_name || "";
+          const clientName = `${clientFirstName} ${clientLastName}`.trim() || "Client";
+          const htmlContent = buildWorkFinishedEmail({
+            freelancerName,
+            clientName,
+            projectTitle: updatedContract.project?.title || "Untitled Project",
+            contractId: updatedContract.contract_id,
+          });
+
+          await sendMail(
+            freelancerEmail,
+            "Work finished update for your contract on SkillHire",
+            htmlContent
+          );
+        }
+      } catch (mailError) {
+        console.error("Failed to send contract completion email:", mailError);
+      }
+    }
 
     return res.status(200).json(updatedContract);
   } catch (error) {

@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import api from "../lib/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import PaymentSection from "../components/PaymentSection.jsx";
+import ReportClientForm from "../components/ReportClientForm.jsx";
 import ReviewForm from "./ReviewForm.jsx";
 
 function formatCurrency(value) {
@@ -159,6 +160,8 @@ function ContractPage() {
       {user?.role === "client" && contract.status === "completed" && hasCompletedPayment ? (
         <ReviewForm contractId={contract.contract_id} reviewerUserId={user.user_id} />
       ) : null}
+
+      {user?.role === "freelancer" ? <ReportClientForm contractId={contract.contract_id} /> : null}
     </section>
   );
 }

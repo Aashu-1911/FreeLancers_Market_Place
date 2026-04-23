@@ -133,6 +133,7 @@ router.post("/register", registerValidation, validateRequest, async (req, res) =
         username: result.user.username,
         email: result.user.email,
         profile_picture: result.user.profile_picture,
+        account_status: result.user.account_status,
         role: normalizedRole,
       },
       freelancer: result.freelancer,
@@ -179,6 +180,10 @@ router.post("/login", loginValidation, validateRequest, async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    if (user.account_status === "suspended") {
+      return res.status(403).json({ message: "Account suspended. Please contact support." });
+    }
+
     const role = getRoleFromUser(user);
 
     if (!role) {
@@ -200,6 +205,7 @@ router.post("/login", loginValidation, validateRequest, async (req, res) => {
         username: user.username,
         email: user.email,
         profile_picture: user.profile_picture,
+        account_status: user.account_status,
         role,
       },
       freelancer: user.freelancer,

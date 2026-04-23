@@ -3,6 +3,8 @@ const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
 const validateRequest = require("../middleware/validateRequest");
+const { sendMail } = require("../utils/mailer");
+const { buildReviewReceivedEmail } = require("../utils/contractEmailTemplates");
 
 const router = express.Router();
 
@@ -81,7 +83,35 @@ router.post("/", authMiddleware, createReviewValidation, validateRequest, async 
         contract_id: contractId,
       },
       include: {
-        client: true,
+        client: {
+          include: {
+            user: {
+              select: {
+                user_id: true,
+                first_name: true,
+                last_name: true,
+              },
+            },
+          },
+        },
+        freelancer: {
+          include: {
+            user: {
+              select: {
+                user_id: true,
+                first_name: true,
+                last_name: true,
+                email: true,
+              },
+            },
+          },
+        },
+        project: {
+          select: {
+            project_id: true,
+            title: true,
+          },
+        },
       },
     });
 
@@ -138,6 +168,35 @@ router.post("/", authMiddleware, createReviewValidation, validateRequest, async 
         },
       },
     });
+
+    try {
+      const freelancerEmail = contract.freelancer?.user?.email;
+
+      if (freelancerEmail) {
+        const freelancerFirstName = contract.freelancer?.user?.first_name || "";
+        const freelancerLastName = contract.freelancer?.user?.last_name || "";
+        const freelancerName = `${freelancerFirstName} ${freelancerLastName}`.trim() || "Freelancer";
+        const clientFirstName = contract.client?.user?.first_name || "";
+        const clientLastName = contract.client?.user?.last_name || "";
+        const clientName = `${clientFirstName} ${clientLastName}`.trim() || "Client";
+
+        const htmlContent = buildReviewReceivedEmail({
+          freelancerName,
+          clientName,
+          projectTitle: contract.project?.title || "Untitled Project",
+          rating,
+          comment,
+        });
+
+        await sendMail(
+          freelancerEmail,
+          "You received a new rating and review on SkillHire",
+          htmlContent
+        );
+      }
+    } catch (mailError) {
+      console.error("Failed to send review email:", mailError);
+    }
 
     return res.status(201).json(withReportMeta(review));
   } catch (error) {

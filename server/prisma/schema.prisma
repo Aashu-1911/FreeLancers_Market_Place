@@ -18,10 +18,16 @@ model User {
   city         String?
   pincode      String?
   password     String
+  account_status String   @default("active")
+  suspended_reason String?
+  suspended_at DateTime?
   created_at   DateTime   @default(now())
   freelancer   Freelancer?
   client       Client?
   reviews      Review[]
+  reports_filed Report[]  @relation("ReportsFiled")
+  reports_against Report[] @relation("ReportsAgainst")
+  reports_reviewed Report[] @relation("ReportsReviewed")
 }
 
 model Freelancer {
@@ -126,6 +132,7 @@ model Contract {
   client          Client      @relation(fields: [client_id], references: [client_id], onDelete: Cascade)
   reviews         Review[]
   payments        Payment[]
+  reports         Report[]
 }
 
 model Review {
@@ -145,4 +152,27 @@ model Payment {
   payment_status    String    @default("pending")
   transaction_date  DateTime  @default(now())
   contract          Contract  @relation(fields: [contract_id], references: [contract_id], onDelete: Cascade)
+}
+
+model Report {
+  report_id            Int       @id @default(autoincrement())
+  contract_id          Int
+  reporter_user_id     Int
+  reported_user_id     Int
+  reason               String
+  description          String?
+  status               String    @default("pending")
+  review_notes         String?
+  reviewed_by_user_id  Int?
+  reviewed_at          DateTime?
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+  contract             Contract  @relation(fields: [contract_id], references: [contract_id], onDelete: Cascade)
+  reporter             User      @relation("ReportsFiled", fields: [reporter_user_id], references: [user_id], onDelete: Cascade)
+  reported_user        User      @relation("ReportsAgainst", fields: [reported_user_id], references: [user_id], onDelete: Cascade)
+  reviewed_by          User?     @relation("ReportsReviewed", fields: [reviewed_by_user_id], references: [user_id], onDelete: SetNull)
+
+  @@unique([contract_id, reporter_user_id])
+  @@index([reported_user_id, status])
+  @@index([status, created_at])
 }

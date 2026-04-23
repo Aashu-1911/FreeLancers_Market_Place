@@ -14,6 +14,7 @@ const applicationRoutes = require("./routes/applications");
 const contractRoutes = require("./routes/contracts");
 const paymentRoutes = require("./routes/payments");
 const reviewRoutes = require("./routes/reviews");
+const reportRoutes = require("./routes/reports");
 const statsRoutes = require("./routes/stats");
 const notificationRoutes = require("./routes/notifications");
 const { notFoundHandler, errorHandler } = require("./middleware/errorHandler");
@@ -99,6 +100,7 @@ app.use("/api/applications", applicationRoutes);
 app.use("/api/contracts", contractRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/reports", reportRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/notifications", notificationRoutes);
 

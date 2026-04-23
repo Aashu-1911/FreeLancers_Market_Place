@@ -3,6 +3,8 @@ const { body } = require("express-validator");
 const prisma = require("../lib/prisma");
 const authMiddleware = require("../middleware/auth");
 const validateRequest = require("../middleware/validateRequest");
+const { sendMail } = require("../utils/mailer");
+const { buildPaymentCompletedEmail } = require("../utils/contractEmailTemplates");
 
 const router = express.Router();
 
@@ -52,6 +54,71 @@ function withPaymentMeta(payment) {
     transaction_id: buildTransactionId(payment),
     remark: status === "completed" ? "Payment completed successfully." : "Payment is pending.",
   };
+}
+
+async function sendPaymentCompletedEmail(contractId, payment) {
+  const contract = await prisma.contract.findUnique({
+    where: {
+      contract_id: contractId,
+    },
+    include: {
+      project: {
+        select: {
+          title: true,
+        },
+      },
+      freelancer: {
+        include: {
+          user: {
+            select: {
+              first_name: true,
+              last_name: true,
+              email: true,
+            },
+          },
+        },
+      },
+      client: {
+        include: {
+          user: {
+            select: {
+              first_name: true,
+              last_name: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const freelancerEmail = contract?.freelancer?.user?.email;
+
+  if (!freelancerEmail) {
+    return;
+  }
+
+  const freelancerFirstName = contract?.freelancer?.user?.first_name || "";
+  const freelancerLastName = contract?.freelancer?.user?.last_name || "";
+  const freelancerName = `${freelancerFirstName} ${freelancerLastName}`.trim() || "Freelancer";
+  const clientFirstName = contract?.client?.user?.first_name || "";
+  const clientLastName = contract?.client?.user?.last_name || "";
+  const clientName = `${clientFirstName} ${clientLastName}`.trim() || "Client";
+
+  const htmlContent = buildPaymentCompletedEmail({
+    freelancerName,
+    clientName,
+    projectTitle: contract?.project?.title || "Untitled Project",
+    contractId: contractId,
+    amount: payment.amount,
+    transactionId: buildTransactionId(payment),
+    paymentDate: payment.transaction_date,
+  });
+
+  await sendMail(
+    freelancerEmail,
+    "Payment completed for your SkillHire contract",
+    htmlContent
+  );
 }
 
 async function canAccessContract(contractId, user) {
@@ -122,6 +189,12 @@ router.post("/", authMiddleware, createPaymentValidation, validateRequest, async
         transaction_date: new Date(),
       },
     });
+
+    try {
+      await sendPaymentCompletedEmail(contractId, payment);
+    } catch (mailError) {
+      console.error("Failed to send payment completion email:", mailError);
+    }
 
     return res.status(201).json(withPaymentMeta(payment));
   } catch (error) {
@@ -204,6 +277,14 @@ router.put("/:id", authMiddleware, updatePaymentValidation, validateRequest, asy
         payment_status: nextStatus,
       },
     });
+
+    if (payment.payment_status !== "completed" && nextStatus === "completed") {
+      try {
+        await sendPaymentCompletedEmail(payment.contract_id, updatedPayment);
+      } catch (mailError) {
+        console.error("Failed to send payment completion email:", mailError);
+      }
+    }
 
     return res.status(200).json(withPaymentMeta(updatedPayment));
   } catch (error) {
