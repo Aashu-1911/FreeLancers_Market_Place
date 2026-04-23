@@ -184,6 +184,7 @@ router.post("/", authMiddleware, createReviewValidation, validateRequest, async 
           freelancerName,
           clientName,
           projectTitle: contract.project?.title || "Untitled Project",
+          contractId: contract.contract_id,
           rating,
           comment,
         });
