@@ -25,6 +25,7 @@ const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || process.env.CORS_ORIGIN || "http://localhost:5173";
 const uploadsDir = path.join(__dirname, "uploads");
+let databaseConnected = false;
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -107,21 +108,26 @@ app.use("/api/notifications", notificationRoutes);
 app.get("/health", async (_req, res) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
+    databaseConnected = true;
     return res.status(200).json({ status: "ok", db: "connected" });
   } catch (error) {
+    databaseConnected = false;
     return res.status(500).json({ status: "error", db: "disconnected", error: error.message });
   }
 });
 
 async function startServer() {
+  app.listen(PORT, () => {
+    console.log(`SkillHire server running on port ${PORT}`);
+  });
+
   try {
     await prisma.$connect();
-    app.listen(PORT, () => {
-      console.log(`SkillHire server running on port ${PORT}`);
-    });
+    databaseConnected = true;
+    console.log("Database connected successfully.");
   } catch (error) {
-    console.error("Failed to start server:", error.message);
-    process.exit(1);
+    databaseConnected = false;
+    console.warn("Database unavailable at startup:", error.message);
   }
 }
 
